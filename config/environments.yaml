@@ -1,0 +1,14 @@
+# Example environment definitions (credentials via env / vault — not in git)
+environments:
+  - id: prod-rd
+    display_name: "Prod Risk Analytics"
+    region: emea
+    connector_profile: prod_autosys
+  - id: uat-rd
+    display_name: "UAT Risk Analytics"
+    region: emea
+    connector_profile: uat_autosys
+  - id: test-rd
+    display_name: "Test Risk Analytics"
+    region: emea
+    connector_profile: test_ps

@@ -1,0 +1,31 @@
+{% include "partials/summary.html" %}
+
+<div class="export-row">
+  <a role="button" class="outline"
+     href="/api/export/left.csv?session_id={{ session_id }}">Export Left CSV</a>
+  <a role="button" class="outline"
+     href="/api/export/right.csv?session_id={{ session_id }}">Export Right CSV</a>
+  <a role="button" class="outline"
+     href="/api/export/comparison.csv?session_id={{ session_id }}">Export comparison CSV</a>
+  <input type="hidden" id="session-id" value="{{ session_id }}">
+</div>
+
+<div class="tabs">
+  <details open>
+    <summary>Trees</summary>
+    <div class="split-pane">
+      {% with snapshot=left_snapshot, side='left', mismatch_ids=result.status_mismatches %}
+      {% include "partials/tree_side.html" %}
+      {% endwith %}
+      {% with snapshot=right_snapshot, side='right', mismatch_ids=result.status_mismatches %}
+      {% include "partials/tree_side.html" %}
+      {% endwith %}
+    </div>
+  </details>
+  <details open>
+    <summary>Table</summary>
+    {% include "partials/table.html" %}
+  </details>
+</div>
+
+<section id="job-detail-panel" class="job-detail-panel"></section>

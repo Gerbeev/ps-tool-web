@@ -1,0 +1,22 @@
+# Job identity mapping between AutoSys and Process Scheduler
+# Priority: explicit pairs, then regex rules
+pairs:
+  - autosys_name: RISK_DAILY_BOX
+    ps_name: risk_daily_topology
+  - autosys_name: RISK_DAILY_ETL
+    ps_name: RiskDaily.EtlJob
+  - autosys_name: RISK_DAILY_RECON
+    ps_name: RiskDaily.ReconJob
+  - autosys_name: RISK_FILE_WAIT_INCOMING
+    ps_name: RiskDaily.FileWaitIncoming
+  - autosys_name: RISK_DOTNET_CALC
+    ps_name: RiskDaily.DotNetCalc
+
+regex_rules:
+  - pattern: "^RISK_(.+)_AUTOSYS$"
+    ps_replacement: "RiskDaily.\\1"
+    scheduler: autosys
+
+normalize:
+  strip_prefixes: ["AS_", "PS_"]
+  lowercase: false

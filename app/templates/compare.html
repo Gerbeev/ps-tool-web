@@ -1,0 +1,62 @@
+{% extends "base.html" %}
+{% block content %}
+<section>
+  <h1>Compare schedulers</h1>
+  <p class="muted">Left vs Right — AutoSys, Process Scheduler, or any pair of contexts.</p>
+
+  <form id="compare-form"
+        hx-post="/api/compare"
+        hx-target="#compare-output"
+        hx-indicator="#compare-spinner">
+    <div class="grid compare-context-grid">
+      <fieldset>
+        <legend>Left (A)</legend>
+        <label>Environment
+          <select name="left_env">
+            {% for env in environments %}
+            <option value="{{ env.id }}" {% if env.id == left_env %}selected{% endif %}>{{ env.display_name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Scheduler
+          <select name="left_scheduler">
+            <option value="autosys" {% if left_scheduler == 'autosys' %}selected{% endif %}>AutoSys</option>
+            <option value="process_scheduler" {% if left_scheduler == 'process_scheduler' %}selected{% endif %}>Process Scheduler</option>
+          </select>
+        </label>
+        <label>Root box / topology
+          <input type="text" name="left_root" placeholder="Optional filter">
+        </label>
+      </fieldset>
+      <fieldset>
+        <legend>Right (B)</legend>
+        <label>Environment
+          <select name="right_env">
+            {% for env in environments %}
+            <option value="{{ env.id }}" {% if env.id == right_env %}selected{% endif %}>{{ env.display_name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <label>Scheduler
+          <select name="right_scheduler">
+            <option value="autosys" {% if right_scheduler == 'autosys' %}selected{% endif %}>AutoSys</option>
+            <option value="process_scheduler" {% if right_scheduler == 'process_scheduler' %}selected{% endif %}>Process Scheduler</option>
+          </select>
+        </label>
+        <label>Root box / topology
+          <input type="text" name="right_root" placeholder="Optional filter">
+        </label>
+      </fieldset>
+    </div>
+    <label>Business date (as_of)
+      <input type="date" name="as_of" value="{{ as_of }}">
+    </label>
+    <button type="submit">Compare</button>
+    <span id="compare-spinner" class="htmx-indicator" aria-live="polite">Loading…</span>
+  </form>
+
+  <div id="compare-output" class="compare-output">
+    <p class="muted">Select contexts and click Compare to load mock topology diff.</p>
+  </div>
+</section>
+{% endblock %}

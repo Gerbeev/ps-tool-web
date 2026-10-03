@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}ps-tool-web Compare{% endblock %}</title>
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
+  <link rel="stylesheet" href="/static/css/custom.css">
+  <script src="https://unpkg.com/htmx.org@2.0.4"></script>
+</head>
+<body>
+  <header class="container-fluid sticky-header">
+    <nav>
+      <ul>
+        <li><strong>ps-tool-web</strong></li>
+      </ul>
+      <ul>
+        <li><a href="/">Compare</a></li>
+      </ul>
+    </nav>
+    <div class="search-bar">
+      <input type="search"
+             id="global-search"
+             name="q"
+             placeholder="Search jobs… (Ctrl+K)"
+             hx-get="/api/search"
+             hx-trigger="keyup changed delay:300ms, search"
+             hx-target="#search-results"
+             hx-include="#global-search"
+             autocomplete="off">
+      <div id="search-results" class="search-dropdown"></div>
+    </div>
+  </header>
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+  <script>
+    document.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+        e.preventDefault();
+        document.getElementById('global-search').focus();
+      }
+    });
+  </script>
+</body>
+</html>
