@@ -1,0 +1,28 @@
+<div class="tree-pane">
+  <h4>{{ side|upper }}</h4>
+  {% macro render_node(node, depth) %}
+  <details class="tree-node" {% if depth < 1 %}open{% endif %}>
+    <summary class="{{ job_status_css(node.job.status) }}">
+      <span class="status-dot"></span>
+      {{ node.job.scheduler_job_name }}
+      <small>({{ node.job.status.value }})</small>
+      {% if node.job.logical_id %}
+      <span class="badge">{{ node.job.logical_id[:24] }}</span>
+      {% endif %}
+      <button type="button" class="link-btn"
+              hx-get="/api/job/{{ side }}/{{ node.job.job_uid }}?session_id={{ session_id }}"
+              hx-target="#job-detail-panel">detail</button>
+    </summary>
+    {% if node.children %}
+    <div class="tree-children">
+      {% for child in node.children %}
+      {{ render_node(child, depth + 1) }}
+      {% endfor %}
+    </div>
+    {% endif %}
+  </details>
+  {% endmacro %}
+  {% for root in snapshot.roots %}
+  {{ render_node(root, 0) }}
+  {% endfor %}
+</div>

@@ -1,0 +1,48 @@
+<table role="grid">
+  <thead>
+    <tr>
+      <th>Match</th>
+      <th>Logical ID</th>
+      <th>Left name</th>
+      <th>Left status</th>
+      <th>Right name</th>
+      <th>Right status</th>
+      <th>Confidence</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for pair in result.pairs %}
+    <tr class="{% if pair.left and pair.right and pair.left.status != pair.right.status %}row-mismatch{% endif %}">
+      <td>{% if pair.left.status == pair.right.status %}ok{% else %}Δ{% endif %}</td>
+      <td><code>{{ pair.logical_id or '—' }}</code></td>
+      <td>{{ pair.left.scheduler_job_name if pair.left else '—' }}</td>
+      <td><span class="{{ job_status_css(pair.left.status) if pair.left else '' }}">{{ pair.left.status.value if pair.left else '—' }}</span></td>
+      <td>{{ pair.right.scheduler_job_name if pair.right else '—' }}</td>
+      <td><span class="{{ job_status_css(pair.right.status) if pair.right else '' }}">{{ pair.right.status.value if pair.right else '—' }}</span></td>
+      <td>{{ pair.confidence.value }}</td>
+    </tr>
+    {% endfor %}
+    {% for job in result.left_only %}
+    <tr class="row-left-only">
+      <td>left only</td>
+      <td><code>{{ job.logical_id or job.scheduler_job_name }}</code></td>
+      <td>{{ job.scheduler_job_name }}</td>
+      <td class="{{ job_status_css(job.status) }}">{{ job.status.value }}</td>
+      <td>—</td>
+      <td>—</td>
+      <td>{{ job.logical_id and 'mapped' or 'name_only' }}</td>
+    </tr>
+    {% endfor %}
+    {% for job in result.right_only %}
+    <tr class="row-right-only">
+      <td>right only</td>
+      <td><code>{{ job.logical_id or job.scheduler_job_name }}</code></td>
+      <td>—</td>
+      <td>—</td>
+      <td>{{ job.scheduler_job_name }}</td>
+      <td class="{{ job_status_css(job.status) }}">{{ job.status.value }}</td>
+      <td>{{ job.logical_id and 'mapped' or 'name_only' }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>

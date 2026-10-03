@@ -1,0 +1,15 @@
+<article>
+  <header>{{ side|upper }} · {{ job.scheduler_job_name }}</header>
+  <dl>
+    <dt>Status</dt><dd class="{{ job_status_css(job.status) }}">{{ job.status.value }} ({{ job.status_raw }})</dd>
+    <dt>Logical ID</dt><dd><code>{{ job.logical_id or '—' }}</code></dd>
+    <dt>Type</dt><dd>{{ job.job_type }}</dd>
+    <dt>Path</dt><dd><code>/{{ job.path_labels|join('/') }}</code></dd>
+    <dt>Start</dt><dd>{{ job.actual_start or '—' }}</dd>
+    <dt>End</dt><dd>{{ job.actual_end or '—' }}</dd>
+    <dt>Duration (s)</dt><dd>{{ job.duration_sec or '—' }}</dd>
+    <dt>Exit code</dt><dd>{{ job.exit_code if job.exit_code is not none else '—' }}</dd>
+    <dt>Machine</dt><dd>{{ job.machine or '—' }}</dd>
+    <dt>Log path</dt><dd><code>{{ job.log_path or '—' }}</code></dd>
+  </dl>
+</article>
