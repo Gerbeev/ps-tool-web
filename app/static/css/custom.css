@@ -73,6 +73,9 @@ body {
 .app-sidebar {
   width: var(--app-sidebar-width);
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
   background: var(--app-sidebar-bg);
   color: var(--app-sidebar-text);
   border-right: 1px solid var(--app-sidebar-border);
@@ -83,10 +86,19 @@ body {
 }
 
 .sidebar-nav {
+  flex: 1;
   padding-top: 0.25rem;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
+  min-height: 0;
+}
+
+.sidebar-footer {
+  flex-shrink: 0;
+  margin-top: auto;
+  padding-top: 0.65rem;
+  border-top: 1px solid var(--app-sidebar-border);
 }
 
 .nav-item {
@@ -110,9 +122,21 @@ body {
 }
 
 .nav-icon {
-  opacity: 0.85;
-  width: 1.1rem;
-  text-align: center;
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.25rem;
+  height: 1.25rem;
+  opacity: 0.92;
+  color: inherit;
+}
+
+.nav-svg,
+.logo-svg {
+  display: block;
+  width: 100%;
+  height: 100%;
 }
 
 .app-main {
@@ -277,8 +301,12 @@ html.sidebar-collapsed .nav-item.active {
 }
 
 html.sidebar-collapsed .nav-icon {
-  width: auto;
-  font-size: 1.1rem;
+  width: 1.25rem;
+  height: 1.25rem;
+}
+
+html.sidebar-collapsed .sidebar-footer {
+  padding-top: 0.5rem;
 }
 
 @media (max-width: 768px) {

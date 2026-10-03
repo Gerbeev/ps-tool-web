@@ -1,3 +1,4 @@
+{% from 'macros/lucide_icons.html' import logo_mark, browse_icon, compare_icon, settings_icon %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -22,31 +23,26 @@
     <aside id="app-sidebar" class="app-sidebar" aria-label="Main navigation">
       <div class="sidebar-header">
         <button type="button" id="sidebar-toggle" class="app-logo-toggle" aria-label="Toggle navigation sidebar" aria-controls="app-sidebar" aria-expanded="true">
-          <span class="logo-icon" aria-hidden="true">
-            <svg class="logo-svg" width="22" height="22" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <rect x="3" y="3" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.75"/>
-              <rect x="13" y="3" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.75"/>
-              <rect x="3" y="13" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.75"/>
-              <rect x="13" y="13" width="8" height="8" rx="1.5" stroke="currentColor" stroke-width="1.75"/>
-            </svg>
-          </span>
+          <span class="logo-icon" aria-hidden="true">{{ logo_mark() }}</span>
           <span class="logo-text">Comparison Tool</span>
         </button>
       </div>
-      <nav class="sidebar-nav">
+      <nav class="sidebar-nav" aria-label="Primary">
         <a href="/browse" class="nav-item {% if active_nav == 'browse' %}active{% endif %}" title="Browse">
-          <span class="nav-icon" aria-hidden="true">◎</span>
+          <span class="nav-icon">{{ browse_icon() }}</span>
           <span class="nav-label">Browse</span>
         </a>
         <a href="/compare" class="nav-item {% if active_nav == 'compare' %}active{% endif %}" title="Compare">
-          <span class="nav-icon" aria-hidden="true">⇄</span>
+          <span class="nav-icon">{{ compare_icon() }}</span>
           <span class="nav-label">Compare</span>
         </a>
-        <a href="/settings" class="nav-item {% if active_nav == 'settings' %}active{% endif %}" title="Settings">
-          <span class="nav-icon" aria-hidden="true">⚙</span>
+      </nav>
+      <div class="sidebar-footer">
+        <a href="/settings" class="nav-item nav-item-settings {% if active_nav == 'settings' %}active{% endif %}" title="Settings">
+          <span class="nav-icon">{{ settings_icon() }}</span>
           <span class="nav-label">Settings</span>
         </a>
-      </nav>
+      </div>
     </aside>
     <div class="app-main">
       <header class="app-topbar">
