@@ -1,0 +1,7 @@
+<p class="browse-meta"><strong>{{ meta_line }}</strong> · {{ snapshot.flat_jobs|length }} jobs</p>
+<div class="browse-tree-wrap">
+  {% with snapshot=snapshot, side='browse', session_id=session_id, job_api_base='/api/browse/job' %}
+  {% include "partials/tree_side.html" %}
+  {% endwith %}
+</div>
+<section id="job-detail-panel" class="job-detail-panel"></section>

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% set active_nav = 'settings' %}
+{% block title %}Settings — ps-tool-web{% endblock %}
+{% block content %}
+<section>
+  <h1>Settings</h1>
+  <p class="muted">Configuration shell for Phase 2 — edit YAML on disk or via your deployment pipeline.</p>
+
+  <article>
+    <h2>Adapters</h2>
+    <p>
+      <code>USE_MOCK_ADAPTERS</code> is currently
+      <strong>{% if use_mock_adapters %}enabled (mock){% else %}disabled (real — not implemented){% endif %}</strong>.
+    </p>
+    <p class="small muted">Set in <code>.env</code> and restart the app. Real UBS connectors are wired when <code>USE_MOCK_ADAPTERS=false</code>.</p>
+  </article>
+
+  <article>
+    <h2>Environments</h2>
+    <p class="small muted">Path: <code>{{ config_dir }}/environments.yaml</code></p>
+    <ul>
+      {% for env in environments %}
+      <li><code>{{ env.id }}</code> — {{ env.display_name }}{% if env.region %} ({{ env.region }}){% endif %}</li>
+      {% endfor %}
+    </ul>
+    <details>
+      <summary>YAML preview</summary>
+      <pre class="config-preview"><code>{{ env_yaml }}</code></pre>
+    </details>
+  </article>
+
+  <article>
+    <h2>Identity map</h2>
+    <p><a href="file://{{ identity_map_path }}">identity_map.yaml</a> (local path on server)</p>
+    <details>
+      <summary>YAML preview</summary>
+      <pre class="config-preview"><code>{{ identity_yaml }}</code></pre>
+    </details>
+  </article>
+</section>
+{% endblock %}

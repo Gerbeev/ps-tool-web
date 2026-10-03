@@ -3,37 +3,69 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{% block title %}ps-tool-web Compare{% endblock %}</title>
+  <title>{% block title %}ps-tool-web{% endblock %}</title>
+  <script>
+    (function () {
+      var stored = localStorage.getItem('ps-tool-theme');
+      var theme = stored || (window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light');
+      document.documentElement.setAttribute('data-theme', theme);
+      var collapsed = localStorage.getItem('ps-tool-sidebar') === 'collapsed';
+      if (collapsed) document.documentElement.classList.add('sidebar-collapsed');
+    })();
+  </script>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@picocss/pico@2/css/pico.min.css">
   <link rel="stylesheet" href="/static/css/custom.css">
   <script src="https://unpkg.com/htmx.org@2.0.4"></script>
 </head>
 <body>
-  <header class="container-fluid sticky-header">
-    <nav>
-      <ul>
-        <li><strong>ps-tool-web</strong></li>
-      </ul>
-      <ul>
-        <li><a href="/">Compare</a></li>
-      </ul>
-    </nav>
-    <div class="search-bar">
-      <input type="search"
-             id="global-search"
-             name="q"
-             placeholder="Search jobs… (Ctrl+K)"
-             hx-get="/api/search"
-             hx-trigger="keyup changed delay:300ms, search"
-             hx-target="#search-results"
-             hx-include="#global-search"
-             autocomplete="off">
-      <div id="search-results" class="search-dropdown"></div>
+  <div class="app-shell">
+    <aside id="app-sidebar" class="app-sidebar" aria-label="Main navigation">
+      <div class="sidebar-brand">
+        <strong>ps-tool-web</strong>
+      </div>
+      <nav class="sidebar-nav">
+        <a href="/browse" class="nav-item {% if active_nav == 'browse' %}active{% endif %}">
+          <span class="nav-icon" aria-hidden="true">◎</span>
+          Browse
+        </a>
+        <a href="/compare" class="nav-item {% if active_nav == 'compare' %}active{% endif %}">
+          <span class="nav-icon" aria-hidden="true">⇄</span>
+          Compare
+        </a>
+        <a href="/settings" class="nav-item {% if active_nav == 'settings' %}active{% endif %}">
+          <span class="nav-icon" aria-hidden="true">⚙</span>
+          Settings
+        </a>
+      </nav>
+    </aside>
+    <div class="app-main">
+      <header class="app-topbar">
+        <button type="button" id="sidebar-toggle" class="icon-btn" aria-label="Toggle menu" aria-controls="app-sidebar">
+          <span class="hamburger" aria-hidden="true"></span>
+        </button>
+        <div class="search-bar">
+          <input type="search"
+                 id="global-search"
+                 name="q"
+                 placeholder="Search jobs… (Ctrl+K)"
+                 hx-get="/api/search"
+                 hx-trigger="keyup changed delay:300ms, search"
+                 hx-target="#search-results"
+                 hx-include="#global-search"
+                 autocomplete="off">
+          <div id="search-results" class="search-dropdown"></div>
+        </div>
+        <button type="button" id="theme-toggle" class="icon-btn theme-toggle" aria-label="Toggle light/dark theme">
+          <span class="theme-icon-light" aria-hidden="true">☀</span>
+          <span class="theme-icon-dark" aria-hidden="true">☾</span>
+        </button>
+      </header>
+      <main class="app-content">
+        {% block content %}{% endblock %}
+      </main>
     </div>
-  </header>
-  <main class="container">
-    {% block content %}{% endblock %}
-  </main>
+  </div>
+  <script src="/static/js/app-shell.js"></script>
   <script>
     document.addEventListener('keydown', (e) => {
       if ((e.ctrlKey || e.metaKey) && e.key === 'k') {

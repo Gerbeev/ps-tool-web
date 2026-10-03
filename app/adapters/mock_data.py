@@ -55,10 +55,21 @@ def _job(
     )
 
 
+def _parse_business_date(context: ComparisonContext) -> datetime:
+    raw = (context.as_of.value or "2026-10-02").strip()
+    try:
+        parts = [int(p) for p in raw.split("-")]
+        return datetime(parts[0], parts[1], parts[2], 6, 0, 0)
+    except (ValueError, IndexError):
+        return datetime(2026, 10, 2, 6, 0, 0)
+
+
 def build_autosys_snapshot(context: ComparisonContext) -> TopologySnapshot:
     """Realistic Risk Analytics AutoSys box tree for demos."""
-    base = datetime(2026, 10, 2, 6, 0, 0)
+    base = _parse_business_date(context)
     side = "left"
+    business_date = context.as_of.value or base.strftime("%Y-%m-%d")
+    recon_failed = business_date == "2026-10-02"
 
     box = _job(
         side,
@@ -87,12 +98,12 @@ def build_autosys_snapshot(context: ComparisonContext) -> TopologySnapshot:
         "RISK_DAILY_RECON",
         ["RISK_DAILY_BOX", "RISK_DAILY_RECON"],
         "cmd",
-        JobStatus.FAILURE,
-        "FAILURE",
+        JobStatus.FAILURE if recon_failed else JobStatus.SUCCESS,
+        "FAILURE" if recon_failed else "SUCCESS",
         parent_uid=box.job_uid,
         start=base + timedelta(minutes=50),
         end=base + timedelta(minutes=55),
-        exit_code=8,
+        exit_code=8 if recon_failed else 0,
     )
     file_wait = _job(
         side,
@@ -153,13 +164,75 @@ def build_autosys_snapshot(context: ComparisonContext) -> TopologySnapshot:
         roots=roots,
         flat_jobs=flat,
         edges=edges,
-        metadata={"adapter": "autosys_mock", "connector_version": "0.0-mock"},
+        metadata={
+            "adapter": "autosys_mock",
+            "connector_version": "0.0-mock",
+            "business_date": business_date,
+        },
     )
 
 
-def build_ps_snapshot(context: ComparisonContext) -> TopologySnapshot:
-    """Process Scheduler topology — intentional diffs vs AutoSys mock."""
-    base = datetime(2026, 10, 2, 6, 0, 0)
+def _ps_topology_id(context: ComparisonContext) -> str:
+    return (
+        context.filters.topology_id
+        or context.filters.root_box
+        or "risk_daily_topology"
+    )
+
+
+def build_ps_weekly_snapshot(context: ComparisonContext) -> TopologySnapshot:
+    """Secondary PS topology for browse demos."""
+    base = _parse_business_date(context)
+    side = "right"
+    topo_name = "risk_weekly_topology"
+
+    topo = _job(
+        side,
+        topo_name,
+        [topo_name],
+        "topology",
+        JobStatus.RUNNING,
+        "Running",
+        start=base,
+    )
+    rollup = _job(
+        side,
+        "RiskWeekly.RollupJob",
+        [topo_name, "RiskWeekly.RollupJob"],
+        "dotnet",
+        JobStatus.SUCCESS,
+        "Completed",
+        parent_uid=topo.job_uid,
+        start=base + timedelta(minutes=10),
+        end=base + timedelta(minutes=40),
+    )
+    archive = _job(
+        side,
+        "RiskWeekly.ArchiveJob",
+        [topo_name, "RiskWeekly.ArchiveJob"],
+        "cmd",
+        JobStatus.PENDING,
+        "Pending",
+        parent_uid=topo.job_uid,
+    )
+    roots = [JobNode(job=topo, children=[JobNode(job=rollup), JobNode(job=archive)])]
+    flat = [topo, rollup, archive]
+    return TopologySnapshot(
+        context=context,
+        roots=roots,
+        flat_jobs=flat,
+        edges=[DependencyEdge(from_uid=topo.job_uid, to_uid=rollup.job_uid)],
+        metadata={
+            "adapter": "process_scheduler_mock",
+            "connector_version": "0.0-mock",
+            "topology_id": topo_name,
+        },
+    )
+
+
+def build_ps_daily_snapshot(context: ComparisonContext) -> TopologySnapshot:
+    """Process Scheduler daily topology — intentional diffs vs AutoSys mock."""
+    base = _parse_business_date(context)
     side = "right"
 
     topo = _job(
@@ -262,5 +335,20 @@ def build_ps_snapshot(context: ComparisonContext) -> TopologySnapshot:
         roots=roots,
         flat_jobs=flat,
         edges=edges,
-        metadata={"adapter": "process_scheduler_mock", "connector_version": "0.0-mock"},
+        metadata={
+            "adapter": "process_scheduler_mock",
+            "connector_version": "0.0-mock",
+            "topology_id": "risk_daily_topology",
+        },
     )
+
+
+def build_ps_snapshot(context: ComparisonContext) -> TopologySnapshot:
+    topo_id = _ps_topology_id(context)
+    if topo_id == "risk_weekly_topology":
+        return build_ps_weekly_snapshot(context)
+    return build_ps_daily_snapshot(context)
+
+
+def list_ps_topology_names() -> list[str]:
+    return ["risk_daily_topology", "risk_weekly_topology"]

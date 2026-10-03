@@ -1,0 +1,21 @@
+<input type="hidden" name="as_of" id="browse-as-of" value="{{ as_of }}">
+{% if scheduler == 'process_scheduler' %}
+<label>Topology
+  <select name="topology" id="browse-topology">
+    {% for t in topologies %}
+    <option value="{{ t }}" {% if t == topology %}selected{% endif %}>{{ t }}</option>
+    {% endfor %}
+    {% if not topologies %}
+    <option value="">(no topologies)</option>
+    {% endif %}
+  </select>
+</label>
+<p class="small muted">Process Scheduler environments may expose multiple topologies.</p>
+{% else %}
+<label>Business date
+  <input type="date" name="as_of" id="browse-as-of-visible" value="{{ as_of }}"
+         onchange="document.getElementById('browse-as-of').value = this.value">
+</label>
+<p class="small muted">AutoSys context is scoped to a single box; mock recon fails on 2026-10-02 only.</p>
+<input type="hidden" name="topology" id="browse-topology" value="">
+{% endif %}
