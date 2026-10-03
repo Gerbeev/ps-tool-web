@@ -6,7 +6,12 @@
   function setSidebar(collapsed) {
     root.classList.toggle('sidebar-collapsed', collapsed);
     localStorage.setItem('ps-tool-sidebar', collapsed ? 'collapsed' : 'expanded');
+    if (toggle) {
+      toggle.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
+    }
   }
+
+  setSidebar(root.classList.contains('sidebar-collapsed'));
 
   if (toggle) {
     toggle.addEventListener('click', function () {

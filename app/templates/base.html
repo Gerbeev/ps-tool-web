@@ -20,9 +20,6 @@
 <body>
   <div class="app-shell">
     <aside id="app-sidebar" class="app-sidebar" aria-label="Main navigation">
-      <div class="sidebar-brand">
-        <strong>ps-tool-web</strong>
-      </div>
       <nav class="sidebar-nav">
         <a href="/browse" class="nav-item {% if active_nav == 'browse' %}active{% endif %}">
           <span class="nav-icon" aria-hidden="true">◎</span>
@@ -40,9 +37,11 @@
     </aside>
     <div class="app-main">
       <header class="app-topbar">
-        <button type="button" id="sidebar-toggle" class="icon-btn" aria-label="Toggle menu" aria-controls="app-sidebar">
-          <span class="hamburger" aria-hidden="true"></span>
-        </button>
+        <div class="topbar-start">
+          <button type="button" id="sidebar-toggle" class="app-logo-toggle" aria-label="Toggle navigation sidebar" aria-controls="app-sidebar" aria-expanded="true">
+            Comparison Tool
+          </button>
+        </div>
         <div class="search-bar">
           <input type="search"
                  id="global-search"
@@ -55,10 +54,12 @@
                  autocomplete="off">
           <div id="search-results" class="search-dropdown"></div>
         </div>
-        <button type="button" id="theme-toggle" class="icon-btn theme-toggle" aria-label="Toggle light/dark theme">
-          <span class="theme-icon-light" aria-hidden="true">☀</span>
-          <span class="theme-icon-dark" aria-hidden="true">☾</span>
-        </button>
+        <div class="topbar-end">
+          <button type="button" id="theme-toggle" class="icon-btn theme-toggle" aria-label="Toggle light/dark theme">
+            <span class="theme-icon-light" aria-hidden="true">☀</span>
+            <span class="theme-icon-dark" aria-hidden="true">☾</span>
+          </button>
+        </div>
       </header>
       <main class="app-content">
         {% block content %}{% endblock %}

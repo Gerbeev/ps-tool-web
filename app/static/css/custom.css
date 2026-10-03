@@ -1,13 +1,13 @@
 /*
- * App theming — light sidebar + Cursor-inspired dark mode.
+ * App theming — dark blue sidebar + Cursor-inspired dark mode.
  * Variables are consumed by layout and Pico overrides below.
  */
 :root,
 [data-theme="light"] {
-  --app-sidebar-bg: #d6ebf9;
-  --app-sidebar-text: #1a3a52;
-  --app-sidebar-active: #b8daf3;
-  --app-sidebar-border: #a8cce6;
+  --app-sidebar-bg: #1a3352;
+  --app-sidebar-text: #e8eef5;
+  --app-sidebar-active: #25466d;
+  --app-sidebar-border: #152a45;
   --app-content-bg: #f8fafc;
   --app-surface: #ffffff;
   --app-text: #1e293b;
@@ -22,11 +22,11 @@
 }
 
 [data-theme="dark"] {
-  /* Cursor IDE–like palette */
-  --app-sidebar-bg: #252526;
-  --app-sidebar-text: #cccccc;
-  --app-sidebar-active: #37373d;
-  --app-sidebar-border: #3e3e42;
+  /* Cursor IDE–like palette with blue-tinted sidebar */
+  --app-sidebar-bg: #0f2744;
+  --app-sidebar-text: #d8e4f0;
+  --app-sidebar-active: #1a3a5c;
+  --app-sidebar-border: #1e3a5f;
   --app-content-bg: #1e1e1e;
   --app-surface: #252526;
   --app-text: #d4d4d4;
@@ -79,12 +79,8 @@ body {
   z-index: 30;
 }
 
-.sidebar-brand {
-  padding: 0.25rem 0.5rem 1rem;
-  font-size: 0.95rem;
-}
-
 .sidebar-nav {
+  padding-top: 0.25rem;
   display: flex;
   flex-direction: column;
   gap: 0.25rem;
@@ -124,15 +120,54 @@ body {
 }
 
 .app-topbar {
-  display: flex;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
   gap: 0.75rem;
   padding: 0.5rem 1rem;
+  min-height: 3rem;
   background: var(--app-topbar-bg);
   border-bottom: 1px solid var(--app-border);
   position: sticky;
   top: 0;
   z-index: 20;
+}
+
+.topbar-start {
+  display: flex;
+  align-items: center;
+  flex-shrink: 0;
+}
+
+.topbar-end {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  justify-self: end;
+}
+
+.app-logo-toggle {
+  background: transparent;
+  border: none;
+  padding: 0.35rem 0.5rem;
+  margin: 0;
+  cursor: pointer;
+  font: inherit;
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--app-text);
+  line-height: 1.25;
+  width: auto;
+  max-width: none;
+  border-radius: 0.35rem;
+}
+
+.app-logo-toggle:hover,
+.app-logo-toggle:focus-visible {
+  color: var(--app-accent);
+  outline: 2px solid var(--app-accent);
+  outline-offset: 2px;
 }
 
 .app-content {
@@ -156,18 +191,15 @@ body {
   cursor: pointer;
   color: var(--app-text);
   line-height: 1;
+  width: auto;
+  max-width: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 
 .icon-btn:hover {
   border-color: var(--app-accent);
-}
-
-.hamburger {
-  display: block;
-  width: 1.1rem;
-  height: 2px;
-  background: currentColor;
-  box-shadow: 0 -5px 0 currentColor, 0 5px 0 currentColor;
 }
 
 .theme-toggle .theme-icon-dark {
@@ -201,9 +233,10 @@ html.sidebar-collapsed .app-sidebar {
 
 .search-bar {
   position: relative;
-  flex: 1;
   max-width: 28rem;
   margin: 0;
+  width: 100%;
+  justify-self: start;
 }
 
 .search-dropdown {
@@ -338,6 +371,22 @@ html.sidebar-collapsed .app-sidebar {
 
 .muted { color: var(--app-muted); }
 .small { font-size: 0.85rem; }
+
+/* Pico defaults buttons to full width in forms — keep intrinsic sizing */
+button,
+input[type="submit"],
+input[type="button"],
+input[type="reset"],
+a[role="button"] {
+  width: auto;
+  max-width: 100%;
+}
+
+.app-content form button[type="submit"],
+.app-content form a[role="button"],
+.export-row a[role="button"] {
+  display: inline-block;
+}
 
 .export-row {
   display: flex;
