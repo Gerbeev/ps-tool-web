@@ -20,6 +20,11 @@
 <body>
   <div class="app-shell">
     <aside id="app-sidebar" class="app-sidebar" aria-label="Main navigation">
+      <div class="sidebar-header">
+        <button type="button" id="sidebar-toggle" class="app-logo-toggle" aria-label="Toggle navigation sidebar" aria-controls="app-sidebar" aria-expanded="true">
+          Comparison Tool
+        </button>
+      </div>
       <nav class="sidebar-nav">
         <a href="/browse" class="nav-item {% if active_nav == 'browse' %}active{% endif %}">
           <span class="nav-icon" aria-hidden="true">◎</span>
@@ -37,11 +42,6 @@
     </aside>
     <div class="app-main">
       <header class="app-topbar">
-        <div class="topbar-start">
-          <button type="button" id="sidebar-toggle" class="app-logo-toggle" aria-label="Toggle navigation sidebar" aria-controls="app-sidebar" aria-expanded="true">
-            Comparison Tool
-          </button>
-        </div>
         <div class="search-bar">
           <input type="search"
                  id="global-search"
