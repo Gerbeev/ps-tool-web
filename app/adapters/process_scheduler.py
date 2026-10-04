@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from app.adapters.base import SchedulerAdapter
-from app.adapters.mock_data import build_ps_snapshot
+from app.adapters.mock_data import build_ps_snapshot, list_ps_topology_names
 from app.models import ComparisonContext, NormalizedJob, SchedulerType, TopologySnapshot
 
 
@@ -24,4 +24,4 @@ class ProcessSchedulerMockAdapter(SchedulerAdapter):
         return None
 
     def list_roots(self, context: ComparisonContext) -> list[str]:
-        return ["risk_daily_topology"]
+        return list_ps_topology_names()

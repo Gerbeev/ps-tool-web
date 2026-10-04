@@ -1,0 +1,45 @@
+{% extends "base.html" %}
+{% set active_nav = 'browse' %}
+{% block title %}Browse — ps-tool-web{% endblock %}
+{% block content %}
+<section>
+  <h1>Browse environment</h1>
+  <p class="muted">Inspect one scheduler context: pick a Process Scheduler topology or an AutoSys business date.</p>
+
+  <form id="browse-form"
+        hx-post="/api/browse/load"
+        hx-target="#browse-output"
+        hx-indicator="#browse-spinner">
+    <label>Environment
+      <select name="environment_id" id="browse-env"
+              hx-get="/api/browse/form"
+              hx-trigger="change"
+              hx-target="#browse-context-fields"
+              hx-include="#browse-env, #browse-scheduler, #browse-as-of, #browse-topology">
+        {% for env in environments %}
+        <option value="{{ env.id }}" {% if env.id == environment_id %}selected{% endif %}>{{ env.display_name }}</option>
+        {% endfor %}
+      </select>
+    </label>
+    <label>Scheduler
+      <select name="scheduler" id="browse-scheduler"
+              hx-get="/api/browse/form"
+              hx-trigger="change"
+              hx-target="#browse-context-fields"
+              hx-include="#browse-env, #browse-scheduler, #browse-as-of, #browse-topology">
+        <option value="process_scheduler" {% if scheduler == 'process_scheduler' %}selected{% endif %}>Process Scheduler</option>
+        <option value="autosys" {% if scheduler == 'autosys' %}selected{% endif %}>AutoSys</option>
+      </select>
+    </label>
+    <div id="browse-context-fields">
+      {% include "partials/browse_form_fields.html" %}
+    </div>
+    <button type="submit">Load tree</button>
+    <span id="browse-spinner" class="htmx-indicator" aria-live="polite">Loading…</span>
+  </form>
+
+  <div id="browse-output" class="browse-output">
+    <p class="muted">Select context and click Load tree.</p>
+  </div>
+</section>
+{% endblock %}

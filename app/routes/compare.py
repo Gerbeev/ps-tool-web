@@ -36,7 +36,7 @@ def _env_options():
     return load_environments()
 
 
-@router.get("/", response_class=HTMLResponse)
+@router.get("/compare", response_class=HTMLResponse)
 async def compare_page(request: Request):
     envs = _env_options()
     default_env = envs[0].id if envs else "uat-rd"
