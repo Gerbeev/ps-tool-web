@@ -418,6 +418,59 @@ html.sidebar-collapsed .sidebar-footer {
   flex-direction: column;
 }
 
+.browse-tree-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 0.75rem 1rem;
+  padding: 0.65rem 0.75rem;
+  border-bottom: 1px solid var(--app-border);
+  background: var(--app-surface);
+  flex-shrink: 0;
+  position: sticky;
+  top: 0;
+  z-index: 3;
+}
+
+.browse-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
+  flex: 1 1 12rem;
+  min-width: 0;
+}
+
+.browse-filter-field-status {
+  flex: 0 1 10rem;
+}
+
+.browse-filter-label {
+  font-size: 0.7rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--app-muted);
+}
+
+.browse-filter-input,
+.browse-filter-select {
+  margin: 0;
+  font-size: 0.875rem;
+  padding: 0.35rem 0.5rem;
+}
+
+.browse-job-row[hidden],
+.browse-job-row.browse-filter-hidden {
+  display: none;
+}
+
+.browse-filter-empty {
+  padding: 1rem 0.75rem;
+  margin: 0;
+  font-size: 0.875rem;
+}
+
 .browse-tree-body {
   flex: 1;
   min-height: 0;

@@ -11,6 +11,7 @@
   <aside id="job-detail-panel" class="browse-detail-panel" aria-live="polite"></aside>
 </div>
 <div id="browse-panel-backdrop" class="browse-panel-backdrop" hidden aria-hidden="true"></div>
+<script src="/static/js/browse-filters.js"></script>
 <script>
   (function () {
     var search = document.getElementById('global-search');
@@ -42,6 +43,9 @@
     var backdrop = document.getElementById('browse-panel-backdrop');
     if (backdrop) {
       backdrop.addEventListener('click', window.psBrowseClosePanel);
+    }
+    if (window.psBrowseFiltersInit) {
+      window.psBrowseFiltersInit();
     }
   })();
 </script>

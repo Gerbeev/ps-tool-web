@@ -6,6 +6,8 @@
   <div class="browse-row-grid browse-job-row"
        role="button"
        tabindex="0"
+       data-job-name="{{ job.scheduler_job_name }}"
+       data-status="{{ job.status.value }}"
        hx-get="{{ job_api_base }}/{{ job.job_uid }}?session_id={{ session_id }}"
        hx-target="#job-detail-panel"
        hx-swap="innerHTML"

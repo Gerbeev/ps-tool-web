@@ -30,7 +30,13 @@ def test_browse_load_returns_full_width_tree_and_lazy_nodes():
     html = resp.text
     assert "browse-workspace" in html
     assert "browse-tree-header" in html
+    assert "browse-tree-toolbar" in html
+    assert 'id="browse-filter-search"' in html
+    assert 'id="browse-filter-status"' in html
     assert "browse-job-row" in html
+    assert 'data-job-name="' in html
+    assert 'data-status="' in html
+    assert "/static/js/browse-filters.js" in html
     assert "browse-tree-expand-btn" in html
     assert 'hx-trigger="revealed once"' in html
     assert '<details class="browse-tree-branch" open>' in html
