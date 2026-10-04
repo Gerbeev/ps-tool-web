@@ -1,4 +1,43 @@
-<table role="grid">
+<div class="table-toolbar">
+  <form class="table-filters"
+        hx-get="/api/compare/table"
+        hx-target="#compare-table-panel"
+        hx-swap="innerHTML">
+    <input type="hidden" name="session_id" value="{{ session_id }}">
+    <label>
+      Filter
+      <select name="filter">
+        <option value="all" {% if filter == 'all' %}selected{% endif %}>All rows</option>
+        <option value="mismatches" {% if filter == 'mismatches' %}selected{% endif %}>Diffs only</option>
+        <option value="matched" {% if filter == 'matched' %}selected{% endif %}>Matched (same status)</option>
+        <option value="status_delta" {% if filter == 'status_delta' %}selected{% endif %}>Status Δ</option>
+        <option value="left_only" {% if filter == 'left_only' %}selected{% endif %}>Left only</option>
+        <option value="right_only" {% if filter == 'right_only' %}selected{% endif %}>Right only</option>
+      </select>
+    </label>
+    <label>
+      Name prefix
+      <input type="text" name="q_prefix" value="{{ q_prefix or '' }}" placeholder="RISK_">
+    </label>
+    <label>
+      Page size
+      <select name="limit">
+        <option value="0" {% if not limit %}selected{% endif %}>All (default)</option>
+        <option value="50" {% if limit == 50 %}selected{% endif %}>50</option>
+        <option value="100" {% if limit == 100 %}selected{% endif %}>100</option>
+        <option value="250" {% if limit == 250 %}selected{% endif %}>250</option>
+      </select>
+    </label>
+    <input type="hidden" name="offset" value="0">
+    <button type="submit">Apply</button>
+  </form>
+  <p class="muted small table-meta">
+    Showing {% if limit and limit > 0 %}{{ rows|length }} of {{ total }}{% else %}{{ total }}{% endif %} rows
+    {% if filter != 'all' %} · filter <code>{{ filter }}</code>{% endif %}
+  </p>
+</div>
+
+<table role="grid" class="compare-table">
   <thead>
     <tr>
       <th>Match</th>
@@ -11,9 +50,14 @@
     </tr>
   </thead>
   <tbody>
-    {% for pair in result.pairs %}
+    {% if not rows %}
+    <tr><td colspan="7" class="muted">No rows for this filter.</td></tr>
+    {% endif %}
+    {% for row in rows %}
+    {% if row.kind == 'pair' and row.pair %}
+    {% set pair = row.pair %}
     <tr class="{% if pair.left and pair.right and pair.left.status != pair.right.status %}row-mismatch{% endif %}">
-      <td>{% if pair.left.status == pair.right.status %}ok{% else %}Δ{% endif %}</td>
+      <td>{% if pair.left and pair.right and pair.left.status == pair.right.status %}ok{% else %}Δ{% endif %}</td>
       <td><code>{{ pair.logical_id or '—' }}</code></td>
       <td>{{ pair.left.scheduler_job_name if pair.left else '—' }}</td>
       <td><span class="{{ job_status_css(pair.left.status) if pair.left else '' }}">{{ pair.left.status.value if pair.left else '—' }}</span></td>
@@ -21,28 +65,45 @@
       <td><span class="{{ job_status_css(pair.right.status) if pair.right else '' }}">{{ pair.right.status.value if pair.right else '—' }}</span></td>
       <td>{{ pair.confidence.value }}</td>
     </tr>
-    {% endfor %}
-    {% for job in result.left_only %}
+    {% elif row.kind == 'left_only' and row.job %}
     <tr class="row-left-only">
       <td>left only</td>
-      <td><code>{{ job.logical_id or job.scheduler_job_name }}</code></td>
-      <td>{{ job.scheduler_job_name }}</td>
-      <td class="{{ job_status_css(job.status) }}">{{ job.status.value }}</td>
+      <td><code>{{ row.logical_id or row.job.scheduler_job_name }}</code></td>
+      <td>{{ row.job.scheduler_job_name }}</td>
+      <td class="{{ job_status_css(row.job.status) }}">{{ row.job.status.value }}</td>
       <td>—</td>
       <td>—</td>
-      <td>{{ job.logical_id and 'mapped' or 'name_only' }}</td>
+      <td>{{ row.job.logical_id and 'mapped' or 'name_only' }}</td>
     </tr>
-    {% endfor %}
-    {% for job in result.right_only %}
+    {% elif row.kind == 'right_only' and row.job %}
     <tr class="row-right-only">
       <td>right only</td>
-      <td><code>{{ job.logical_id or job.scheduler_job_name }}</code></td>
+      <td><code>{{ row.logical_id or row.job.scheduler_job_name }}</code></td>
       <td>—</td>
       <td>—</td>
-      <td>{{ job.scheduler_job_name }}</td>
-      <td class="{{ job_status_css(job.status) }}">{{ job.status.value }}</td>
-      <td>{{ job.logical_id and 'mapped' or 'name_only' }}</td>
+      <td>{{ row.job.scheduler_job_name }}</td>
+      <td class="{{ job_status_css(row.job.status) }}">{{ row.job.status.value }}</td>
+      <td>{{ row.job.logical_id and 'mapped' or 'name_only' }}</td>
     </tr>
+    {% endif %}
     {% endfor %}
   </tbody>
 </table>
+
+{% if limit and limit > 0 and total > limit %}
+<nav class="table-pager" aria-label="Table pages">
+  {% if offset > 0 %}
+  {% set prev_offset = offset - limit %}
+  <button type="button"
+          hx-get="/api/compare/table?session_id={{ session_id }}&filter={{ filter }}&limit={{ limit }}&offset={{ prev_offset if prev_offset > 0 else 0 }}&q_prefix={{ q_prefix or '' }}"
+          hx-target="#compare-table-panel"
+          hx-swap="innerHTML">Previous</button>
+  {% endif %}
+  {% if offset + limit < total %}
+  <button type="button"
+          hx-get="/api/compare/table?session_id={{ session_id }}&filter={{ filter }}&limit={{ limit }}&offset={{ offset + limit }}&q_prefix={{ q_prefix or '' }}"
+          hx-target="#compare-table-panel"
+          hx-swap="innerHTML">Next</button>
+  {% endif %}
+</nav>
+{% endif %}

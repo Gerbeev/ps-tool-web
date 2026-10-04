@@ -2,20 +2,22 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Form, Request
+from fastapi import APIRouter, Form, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from app.config import load_environments
+from app.config import get_settings, load_environments
 from app.models import AsOf, AsOfKind, ComparisonContext, ContextFilters, SchedulerType
 from app.search.sqlite_fts import search_index
 from app.services.comparison import compare_contexts, fetch_snapshot, job_status_css
-from app.services.export_csv import export_topology_csv
+from app.services.table_rows import iter_table_rows, page_table_rows
+from app.services.topology_index import child_count, get_child_nodes, lazy_roots
 from app.session_store import CompareSession, session_store
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 templates.env.globals["job_status_css"] = job_status_css
+templates.env.globals["tree_child_count"] = child_count
 
 
 def _parse_context(
@@ -34,6 +36,20 @@ def _parse_context(
 
 def _env_options():
     return load_environments()
+
+
+def _mismatch_logical_ids(result) -> set[str]:
+    ids: set[str] = set()
+    for pair in result.status_mismatches:
+        if pair.logical_id:
+            ids.add(pair.logical_id)
+    for job in result.left_only:
+        lid = job.logical_id or job.scheduler_job_name
+        ids.add(lid)
+    for job in result.right_only:
+        lid = job.logical_id or job.scheduler_job_name
+        ids.add(lid)
+    return ids
 
 
 @router.get("/compare", response_class=HTMLResponse)
@@ -85,14 +101,67 @@ async def run_compare(
             result=result,
         )
     )
+    settings = get_settings()
     return templates.TemplateResponse(
         request,
         "partials/compare_results.html",
         {
             "result": result,
-            "left_snapshot": left_snap,
-            "right_snapshot": right_snap,
             "session_id": sid,
+            "table_filter": "all",
+            "table_limit": settings.table_page_size_default,
+            "mismatch_ids": _mismatch_logical_ids(result),
+        },
+    )
+
+
+@router.get("/api/compare/table", response_class=HTMLResponse)
+async def compare_table(
+    request: Request,
+    session_id: str,
+    filter: str = Query("all", alias="filter"),
+    offset: int = Query(0, ge=0),
+    limit: int = Query(0, ge=0),
+    q_prefix: str = Query(""),
+):
+    session = session_store.get(session_id)
+    if not session:
+        return HTMLResponse("<p>Session expired. Run Compare again.</p>", status_code=404)
+    rows = iter_table_rows(session.result, filter_name=filter, q_prefix=q_prefix)
+    page, total = page_table_rows(rows, offset=offset, limit=limit or None)
+    settings = get_settings()
+    return templates.TemplateResponse(
+        request,
+        "partials/table.html",
+        {
+            "rows": page,
+            "session_id": session_id,
+            "filter": filter,
+            "offset": offset,
+            "limit": limit,
+            "total": total,
+            "q_prefix": q_prefix,
+            "default_limit": settings.table_page_size_default,
+        },
+    )
+
+
+@router.get("/api/compare/trees", response_class=HTMLResponse)
+async def compare_trees(request: Request, session_id: str):
+    session = session_store.get(session_id)
+    if not session:
+        return HTMLResponse("<p>Session expired. Run Compare again.</p>", status_code=404)
+    mismatch_ids = _mismatch_logical_ids(session.result)
+    return templates.TemplateResponse(
+        request,
+        "partials/compare_trees.html",
+        {
+            "left_snapshot": session.left_snapshot,
+            "right_snapshot": session.right_snapshot,
+            "left_roots": lazy_roots(session.left_snapshot),
+            "right_roots": lazy_roots(session.right_snapshot),
+            "session_id": session_id,
+            "mismatch_ids": mismatch_ids,
         },
     )
 
@@ -103,31 +172,24 @@ async def tree_partial(request: Request, side: str, session_id: str, parent_uid:
     if not session:
         return HTMLResponse("<p>Session expired. Run Compare again.</p>", status_code=404)
     snap = session.left_snapshot if side == "left" else session.right_snapshot
-    nodes = snap.roots if not parent_uid else _find_children(snap, parent_uid)
+    mismatch_ids = _mismatch_logical_ids(session.result)
+    if not parent_uid:
+        nodes = lazy_roots(snap)
+    else:
+        nodes = get_child_nodes(snap, parent_uid)
     return templates.TemplateResponse(
         request,
         "partials/tree_nodes.html",
-        {"nodes": nodes, "side": side, "session_id": session_id, "depth": 0},
+        {
+            "nodes": nodes,
+            "side": side,
+            "session_id": session_id,
+            "snapshot": snap,
+            "mismatch_ids": mismatch_ids,
+            "tree_api_base": f"/api/tree/{side}",
+            "job_api_base": f"/api/job/{side}",
+        },
     )
-
-
-def _find_children(snap, parent_uid: str):
-    from app.models import JobNode
-
-    parent = next((j for j in snap.flat_jobs if j.job_uid == parent_uid), None)
-    if not parent:
-        return []
-
-    def walk(nodes):
-        for n in nodes:
-            if n.job.job_uid == parent_uid:
-                return n.children
-            found = walk(n.children)
-            if found is not None:
-                return found
-        return None
-
-    return walk(snap.roots) or []
 
 
 @router.get("/api/job/{side}/{uid}", response_class=HTMLResponse)

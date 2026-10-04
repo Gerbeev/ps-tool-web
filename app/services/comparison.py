@@ -14,6 +14,7 @@ from app.models import (
 )
 from app.services.identity import annotate_snapshot_jobs, logical_id_for_job
 from app.services.snapshot_cache import SnapshotCache, snapshot_cache
+from app.services.topology_index import ensure_topology_indexes
 
 
 TIMING_DELTA_THRESHOLD_SEC = 60.0
@@ -31,9 +32,11 @@ def fetch_snapshot(
     if snap is None:
         snap = adapter.fetch_topology(context)
         annotate_snapshot_jobs(snap.flat_jobs, context.scheduler)
+        ensure_topology_indexes(snap)
         c.set(key, snap)
     else:
         annotate_snapshot_jobs(snap.flat_jobs, context.scheduler)
+        ensure_topology_indexes(snap)
     return snap, key
 
 

@@ -1,0 +1,35 @@
+{% macro render_lazy_node(node, side, session_id, snapshot, mismatch_ids, tree_api_base, job_api_base) %}
+{% set job = node.job %}
+{% set n_children = tree_child_count(snapshot, job.job_uid) %}
+{% set mismatch = job.logical_id in mismatch_ids or job.scheduler_job_name in mismatch_ids %}
+<details class="tree-node{% if mismatch %} tree-mismatch{% endif %}">
+  <summary class="{{ job_status_css(job.status) }}">
+    <span class="status-dot"></span>
+    {{ job.scheduler_job_name }}
+    <small>({{ job.status.value }})</small>
+    {% if n_children %}
+    <span class="badge muted">+{{ n_children }}</span>
+    {% endif %}
+    {% if job.logical_id %}
+    <span class="badge">{{ job.logical_id[:24] }}</span>
+    {% endif %}
+    <button type="button" class="link-btn"
+            hx-get="{{ job_api_base }}/{{ job.job_uid }}?session_id={{ session_id }}"
+            hx-target="#job-detail-panel">detail</button>
+  </summary>
+  {% if n_children %}
+  <div class="tree-children"
+       hx-get="{{ tree_api_base }}?session_id={{ session_id }}&parent_uid={{ job.job_uid }}"
+       hx-trigger="toggle from:closest details[target.open], once"
+       hx-target="this"
+       hx-swap="innerHTML">
+  </div>
+  {% endif %}
+</details>
+{% endmacro %}
+
+{% macro render_lazy_nodes(nodes, side, session_id, snapshot, mismatch_ids, tree_api_base, job_api_base) %}
+{% for node in nodes %}
+{{ render_lazy_node(node, side, session_id, snapshot, mismatch_ids, tree_api_base, job_api_base) }}
+{% endfor %}
+{% endmacro %}

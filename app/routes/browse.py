@@ -11,11 +11,13 @@ from app.config import load_environments
 from app.models import AsOf, AsOfKind, ComparisonContext, ContextFilters, SchedulerType
 from app.search.sqlite_fts import search_index
 from app.services.comparison import fetch_snapshot, job_status_css
+from app.services.topology_index import child_count, get_child_nodes, lazy_roots
 from app.session_store import BrowseSession, session_store
 
 router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 templates.env.globals["job_status_css"] = job_status_css
+templates.env.globals["tree_child_count"] = child_count
 
 
 def _env_options():
@@ -142,4 +144,29 @@ async def browse_job_detail(request: Request, uid: str, session_id: str):
         request,
         "partials/job_detail.html",
         {"job": job, "side": "browse"},
+    )
+
+
+@router.get("/api/browse/tree", response_class=HTMLResponse)
+async def browse_tree(request: Request, session_id: str, parent_uid: str = ""):
+    session = session_store.get_browse(session_id)
+    if not session:
+        return HTMLResponse("<p>Session expired. Load the environment again.</p>", status_code=404)
+    snap = session.snapshot
+    if not parent_uid:
+        nodes = lazy_roots(snap)
+    else:
+        nodes = get_child_nodes(snap, parent_uid)
+    return templates.TemplateResponse(
+        request,
+        "partials/tree_nodes.html",
+        {
+            "nodes": nodes,
+            "side": "browse",
+            "session_id": session_id,
+            "snapshot": snap,
+            "mismatch_ids": set(),
+            "tree_api_base": "/api/browse/tree",
+            "job_api_base": "/api/browse/job",
+        },
     )

@@ -52,6 +52,8 @@ class AppSettings(BaseModel):
     snapshot_cache_ttl_sec: int = 180
     search_db_path: Path = Field(default_factory=lambda: _repo_root() / "data" / "search.db")
     use_mock_adapters: bool = True
+    mock_job_count: int = 0
+    table_page_size_default: int = 0  # 0 = show all rows on first load
 
 
 @lru_cache
@@ -66,6 +68,8 @@ def get_settings() -> AppSettings:
         snapshot_cache_ttl_sec=int(os.getenv("SNAPSHOT_CACHE_TTL_SEC", "180")),
         search_db_path=Path(os.getenv("SEARCH_DB_PATH", str(root / "data" / "search.db"))),
         use_mock_adapters=os.getenv("USE_MOCK_ADAPTERS", "true").lower() in ("1", "true", "yes"),
+        mock_job_count=int(os.getenv("MOCK_JOB_COUNT", "0")),
+        table_page_size_default=int(os.getenv("TABLE_PAGE_SIZE", "0")),
     )
 
 

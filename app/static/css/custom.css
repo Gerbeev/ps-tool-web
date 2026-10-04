@@ -412,6 +412,37 @@ html.sidebar-collapsed .sidebar-footer {
   text-align: center;
 }
 
+.summary-card-clickable {
+  cursor: pointer;
+}
+
+.summary-card-clickable:hover {
+  outline: 2px solid var(--pico-primary, #0ea5e9);
+}
+
+.table-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+.table-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+  align-items: end;
+  margin: 0;
+}
+
+.table-pager {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
 .card-value {
   font-size: 1.75rem;
   font-weight: 700;
