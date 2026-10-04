@@ -10,6 +10,11 @@
     <dt>Duration (s)</dt><dd>{{ job.duration_sec or '—' }}</dd>
     <dt>Exit code</dt><dd>{{ job.exit_code if job.exit_code is not none else '—' }}</dd>
     <dt>Machine</dt><dd>{{ job.machine or '—' }}</dd>
+    <dt>Schedule</dt><dd><code>{{ job.schedule.comparable() if job.schedule else '—' }}</code></dd>
+    <dt>Command</dt><dd><code>{{ job.command or '—' }}</code></dd>
+    <dt>Condition</dt><dd><code>{{ job.condition or '—' }}</code></dd>
+    <dt>Resolved command</dt><dd><code>{{ job.resolved_command or '—' }}</code></dd>
+    <dt>Log paths</dt><dd>{% if job.log_paths %}<ul>{% for p in job.log_paths %}<li><code>{{ p }}</code></li>{% endfor %}</ul>{% else %}—{% endif %}</dd>
     <dt>Log path</dt><dd><code>{{ job.log_path or '—' }}</code></dd>
   </dl>
 </article>

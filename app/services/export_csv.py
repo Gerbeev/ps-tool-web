@@ -119,10 +119,18 @@ def _timing_delta_pair(pair: JobPair) -> str:
     return ""
 
 
-def _diff_kind(pair: JobPair) -> str:
+def _diff_kind(pair: JobPair, result: ComparisonResult | None = None) -> str:
     if pair.left and pair.right:
         if pair.left.status != pair.right.status:
             return "status_mismatch"
+        if result and any(
+            m.logical_id == pair.logical_id
+            for m in result.field_mismatches
+            if m.field.value not in ("start_time", "end_time")
+        ):
+            return "definition_mismatch"
+        if result and pair in result.timing_deltas:
+            return "timing_mismatch"
         return "ok"
     if pair.left:
         return "left_only"
@@ -146,7 +154,7 @@ def iter_comparison_rows(result: ComparisonResult):
             "right_name": pair.right.scheduler_job_name if pair.right else "",
             "left_status": pair.left.status.value if pair.left else "",
             "right_status": pair.right.status.value if pair.right else "",
-            "diff_kind": _diff_kind(pair),
+                "diff_kind": _diff_kind(pair, result),
             "timing_delta_sec": _timing_delta_pair(pair),
             "match_confidence": pair.confidence.value,
         }

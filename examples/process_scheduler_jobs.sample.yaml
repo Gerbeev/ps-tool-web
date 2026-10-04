@@ -1,0 +1,99 @@
+# Process Scheduler jobs mirroring AutoSys definitions for migration parity.
+scheduler: process_scheduler
+topology_id: risk_daily_topology
+jobs:
+  - name: risk_daily_topology
+    path: [risk_daily_topology]
+    job_type: topology
+    schedule:
+      expression: "0 6 * * *"
+      calendar: every_day
+      timezone: Europe/Zurich
+    command: null
+    condition: null
+    log_paths:
+      - /logs/ps/risk_daily_topology/run.log
+    resolved_command: null
+    resolved_parameters: {}
+
+  - name: RiskDaily.EtlJob
+    path: [risk_daily_topology, RiskDaily.EtlJob]
+    job_type: dotnet
+    schedule:
+      expression: "5 6 * * *"
+      calendar: every_day
+    command: "/opt/risk/bin/risk_etl.sh --business-date {BusinessDate}"
+    condition: "Finish(RiskDaily.FileWaitIncoming)"
+    log_paths:
+      - /logs/ps/RiskDaily.EtlJob.out
+      - /logs/ps/RiskDaily.EtlJob.err
+    resolved_command: "/opt/risk/bin/risk_etl.sh --business-date 2026-10-02"
+    resolved_parameters:
+      BusinessDate: "2026-10-02"
+
+  - name: RiskDaily.FileWaitIncoming
+    path: [risk_daily_topology, RiskDaily.FileWaitIncoming]
+    job_type: file_wait
+    schedule:
+      raw: "offset_minutes: 1"
+    command: "/data/incoming/RISK_{BusinessDate}.done"
+    condition: null
+    log_paths:
+      - /logs/ps/RiskDaily.FileWaitIncoming.out
+    resolved_command: "/data/incoming/RISK_2026-10-02.done"
+    resolved_parameters:
+      BusinessDate: "2026-10-02"
+
+  - name: RiskDaily.DotNetCalc
+    path: [risk_daily_topology, RiskDaily.DotNetCalc]
+    job_type: dotnet
+    schedule:
+      expression: "46 6 * * *"
+      calendar: every_day
+    command: "dotnet /opt/risk/RiskCalc.dll --mode daily --date {BusinessDate}"
+    condition: "Finish(RiskDaily.EtlJob)"
+    log_paths:
+      - /logs/ps/RiskDaily.DotNetCalc.out
+    resolved_command: "dotnet /opt/risk/RiskCalc.dll --mode daily --date 2026-10-02"
+    resolved_parameters:
+      BusinessDate: "2026-10-02"
+
+  - name: RiskDaily.ReconJob
+    path: [risk_daily_topology, RiskDaily.ReconJob]
+    job_type: dotnet
+    schedule:
+      expression: "50 6 * * *"
+      calendar: every_day
+    command: "/opt/risk/bin/recon.sh --date {BusinessDate}"
+    condition: "Finish(RiskDaily.DotNetCalc)"
+    log_paths:
+      - /logs/ps/RiskDaily.ReconJob.out
+      - /logs/ps/RiskDaily.ReconJob.err
+    resolved_command: "/opt/risk/bin/recon.sh --date 2026-10-02"
+    resolved_parameters:
+      BusinessDate: "2026-10-02"
+
+  - name: RiskDaily.PostProcess
+    path: [risk_daily_topology, RiskDaily.PostProcess]
+    job_type: dotnet
+    schedule:
+      expression: "0 7 * * *"
+      calendar: every_day
+    command: "dotnet /opt/risk/PostProcess.dll"
+    condition: "Finish(RiskDaily.ReconJob)"
+    log_paths:
+      - /logs/ps/RiskDaily.PostProcess.log
+    resolved_command: null
+    resolved_parameters: {}
+
+  - name: RiskDaily.AdHocCheck
+    path: [RiskDaily.AdHocCheck]
+    job_type: cmd
+    schedule:
+      raw: on_demand
+    command: "/opt/risk/bin/adhoc_check.sh"
+    condition: null
+    log_paths:
+      - /logs/ps/RiskDaily.AdHocCheck.log
+    resolved_command: null
+    resolved_parameters: {}

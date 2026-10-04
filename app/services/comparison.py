@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+from datetime import datetime
+
 from app.adapters.factory import get_adapter
 from app.models import (
+    ComparedField,
     ComparisonContext,
     ComparisonResult,
     ComparisonSummary,
+    FieldMismatch,
     JobPair,
-    JobStatus,
     MatchConfidence,
     NormalizedJob,
 )
@@ -74,6 +77,9 @@ def compare_contexts(
     right_only: list[NormalizedJob] = []
     status_mismatches: list[JobPair] = []
     timing_deltas: list[JobPair] = []
+    definition_mismatches: list[JobPair] = []
+    field_mismatches: list[FieldMismatch] = []
+    schedule_mm = command_mm = condition_mm = log_mm = resolved_cmd_mm = timing_mm = 0
 
     for lid in sorted(all_keys):
         lj = left_by_logical.get(lid)
@@ -94,6 +100,23 @@ def compare_contexts(
             delta = _timing_delta_sec(lj, rj)
             if delta is not None and delta > timing_threshold_sec:
                 timing_deltas.append(pair)
+            mismatches = _compare_job_fields(lj, rj, lid, timing_threshold_sec)
+            if mismatches:
+                definition_mismatches.append(pair)
+                field_mismatches.extend(mismatches)
+                for m in mismatches:
+                    if m.field == ComparedField.SCHEDULE:
+                        schedule_mm += 1
+                    elif m.field == ComparedField.COMMAND:
+                        command_mm += 1
+                    elif m.field == ComparedField.CONDITION:
+                        condition_mm += 1
+                    elif m.field == ComparedField.LOG_PATHS:
+                        log_mm += 1
+                    elif m.field == ComparedField.RESOLVED_COMMAND:
+                        resolved_cmd_mm += 1
+                    elif m.field in (ComparedField.START_TIME, ComparedField.END_TIME):
+                        timing_mm += 1
         elif lj:
             left_only.append(lj)
         elif rj:
@@ -104,6 +127,12 @@ def compare_contexts(
         total_right=len(right_snap.flat_jobs),
         matched=len(pairs),
         mismatched_status=len(status_mismatches),
+        mismatched_schedule=schedule_mm,
+        mismatched_command=command_mm,
+        mismatched_condition=condition_mm,
+        mismatched_log_paths=log_mm,
+        mismatched_resolved_command=resolved_cmd_mm,
+        mismatched_timing=timing_mm,
         left_only_count=len(left_only),
         right_only_count=len(right_only),
     )
@@ -116,8 +145,93 @@ def compare_contexts(
         right_only=right_only,
         status_mismatches=status_mismatches,
         timing_deltas=timing_deltas,
+        definition_mismatches=definition_mismatches,
+        field_mismatches=field_mismatches,
         summary=summary,
     )
+
+
+def _compare_job_fields(
+    left: NormalizedJob,
+    right: NormalizedJob,
+    logical_id: str | None,
+    timing_threshold_sec: float,
+) -> list[FieldMismatch]:
+    out: list[FieldMismatch] = []
+
+    def record(field: ComparedField, lv: str, rv: str, *, time_field: bool = False) -> None:
+        if time_field:
+            if _times_within_threshold(lv, rv, timing_threshold_sec):
+                return
+        elif lv == rv:
+            return
+        out.append(
+            FieldMismatch(logical_id=logical_id, field=field, left_value=lv, right_value=rv)
+        )
+
+    record(ComparedField.SCHEDULE, _schedule_repr(left), _schedule_repr(right))
+    record(ComparedField.COMMAND, _norm_text(left.command), _norm_text(right.command))
+    record(ComparedField.CONDITION, _norm_text(left.condition), _norm_text(right.condition))
+    record(
+        ComparedField.LOG_PATHS,
+        _log_paths_repr(left.log_paths),
+        _log_paths_repr(right.log_paths),
+    )
+    record(
+        ComparedField.RESOLVED_COMMAND,
+        _norm_text(left.resolved_command),
+        _norm_text(right.resolved_command),
+    )
+    record(
+        ComparedField.START_TIME,
+        _time_repr(left.actual_start),
+        _time_repr(right.actual_start),
+        time_field=True,
+    )
+    record(
+        ComparedField.END_TIME,
+        _time_repr(left.actual_end),
+        _time_repr(right.actual_end),
+        time_field=True,
+    )
+    return out
+
+
+def _norm_text(value: str | None) -> str:
+    return (value or "").strip()
+
+
+def _schedule_repr(job: NormalizedJob) -> str:
+    if job.schedule:
+        return job.schedule.comparable()
+    return ""
+
+
+def _log_paths_repr(paths: list[str]) -> str:
+    return ";".join(sorted(p.strip() for p in paths if p.strip()))
+
+
+def _time_repr(dt: datetime | None) -> str:
+    if dt is None:
+        return ""
+    return dt.isoformat()
+
+
+def _times_within_threshold(left: str, right: str, threshold_sec: float) -> bool:
+    if not left and not right:
+        return True
+    if not left or not right:
+        return False
+    try:
+        ld = datetime.fromisoformat(left.replace("Z", "+00:00"))
+        rd = datetime.fromisoformat(right.replace("Z", "+00:00"))
+    except ValueError:
+        return left == right
+    if ld.tzinfo is None and rd.tzinfo is not None:
+        ld = ld.replace(tzinfo=rd.tzinfo)
+    if rd.tzinfo is None and ld.tzinfo is not None:
+        rd = rd.replace(tzinfo=ld.tzinfo)
+    return abs((ld - rd).total_seconds()) <= threshold_sec
 
 
 def _best_confidence(a: MatchConfidence | None, b: MatchConfidence | None) -> MatchConfidence:
@@ -141,7 +255,9 @@ def _timing_delta_sec(left: NormalizedJob, right: NormalizedJob) -> float | None
     return None
 
 
-def job_status_css(status: JobStatus) -> str:
+def job_status_css(status) -> str:
+    from app.models import JobStatus
+
     return {
         JobStatus.SUCCESS: "status-success",
         JobStatus.FAILURE: "status-failure",

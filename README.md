@@ -23,6 +23,9 @@ Default demo: **UAT AutoSys (left)** vs **Test Process Scheduler (right)**, busi
 - Left-only legacy report job
 - Right-only ad hoc / post-process jobs
 - Timing deltas on several paired jobs
+- Definition parity fields on `NormalizedJob` (schedule, command, condition, logs, resolved command) — see `docs/job-field-mapping.md`
+
+Sample job payloads loaded by mock adapters: `examples/autosys_jobs.sample.yaml`, `examples/process_scheduler_jobs.sample.yaml`.
 
 ## Configuration
 
