@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from app.models import ComparisonResult, JobPair, NormalizedJob
+from app.models import ComparisonResult, JobPair, SnapshotJob
 
 
 @dataclass(frozen=True)
@@ -12,7 +12,7 @@ class TableRow:
     kind: str  # pair | left_only | right_only
     logical_id: str
     pair: JobPair | None = None
-    job: NormalizedJob | None = None
+    job: SnapshotJob | None = None
 
     @property
     def is_mismatch_row(self) -> bool:
@@ -21,6 +21,12 @@ class TableRow:
         if self.pair and self.pair.left and self.pair.right:
             return self.pair.left.status != self.pair.right.status
         return False
+
+
+def parameter_mismatches_for_pair(result: ComparisonResult, logical_id: str | None) -> list:
+    if not logical_id:
+        return []
+    return [m for m in result.parameter_mismatches if m.logical_id == logical_id]
 
 
 def iter_table_rows(
@@ -32,7 +38,7 @@ def iter_table_rows(
     prefix = q_prefix.strip().lower()
     rows: list[TableRow] = []
 
-    def name_matches(job: NormalizedJob | None) -> bool:
+    def name_matches(job: SnapshotJob | None) -> bool:
         if not prefix or not job:
             return True
         return job.scheduler_job_name.lower().startswith(prefix) or (
@@ -47,8 +53,10 @@ def iter_table_rows(
                 not pair.left or not pair.right or pair.left.status == pair.right.status
             ):
                 continue
-            if filter_name == "mismatches" and pair.left and pair.right and pair.left.status == pair.right.status:
-                continue
+            if filter_name == "mismatches" and pair.left and pair.right:
+                has_param_delta = bool(parameter_mismatches_for_pair(result, pair.logical_id))
+                if pair.left.status == pair.right.status and not has_param_delta:
+                    continue
             if not name_matches(pair.left) and not name_matches(pair.right):
                 continue
             rows.append(

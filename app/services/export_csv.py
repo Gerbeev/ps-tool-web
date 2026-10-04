@@ -7,7 +7,7 @@ import io
 from datetime import datetime
 from typing import Iterable
 
-from app.models import ComparisonContext, ComparisonResult, JobPair, NormalizedJob, TopologySnapshot
+from app.models import ComparisonContext, ComparisonResult, JobPair, SnapshotJob, TopologySnapshot
 
 TOPOLOGY_COLUMNS = [
     "logical_id",
@@ -22,7 +22,13 @@ TOPOLOGY_COLUMNS = [
     "duration_sec",
     "exit_code",
     "machine",
-    "log_path",
+    "jil_job_name",
+    "command",
+    "condition",
+    "start_times",
+    "std_out_file",
+    "std_err_file",
+    "resolved_command",
     "scheduler",
     "environment_id",
     "as_of",
@@ -36,6 +42,7 @@ COMPARISON_COLUMNS = [
     "left_status",
     "right_status",
     "diff_kind",
+    "parameter_mismatches",
     "timing_delta_sec",
     "match_confidence",
 ]
@@ -47,7 +54,7 @@ def _as_of_str(context: ComparisonContext) -> str:
     return context.as_of.kind.value
 
 
-def _parent_name(job: NormalizedJob, by_uid: dict[str, NormalizedJob]) -> str:
+def _parent_name(job: SnapshotJob, by_uid: dict[str, SnapshotJob]) -> str:
     if not job.parent_uid:
         return ""
     parent = by_uid.get(job.parent_uid)
@@ -76,6 +83,8 @@ def iter_topology_rows(snapshot: TopologySnapshot):
     jobs = sorted(snapshot.flat_jobs, key=lambda j: "/".join(j.path_labels))
     ctx = snapshot.context
     for job in jobs:
+        jil = job.autosys.jil
+        run = job.autosys.run
         yield {
             "logical_id": job.logical_id or "",
             "scheduler_job_name": job.scheduler_job_name,
@@ -89,7 +98,13 @@ def iter_topology_rows(snapshot: TopologySnapshot):
             "duration_sec": job.duration_sec if job.duration_sec is not None else "",
             "exit_code": job.exit_code if job.exit_code is not None else "",
             "machine": job.machine or "",
-            "log_path": job.log_path or "",
+            "jil_job_name": jil.job_name or "",
+            "command": jil.command or jil.watch_file or "",
+            "condition": jil.condition or "",
+            "start_times": jil.start_times or "",
+            "std_out_file": jil.std_out_file or "",
+            "std_err_file": jil.std_err_file or "",
+            "resolved_command": run.resolved_command or "",
             "scheduler": ctx.scheduler.value,
             "environment_id": ctx.environment_id,
             "as_of": _as_of_str(ctx),
@@ -125,8 +140,8 @@ def _diff_kind(pair: JobPair, result: ComparisonResult | None = None) -> str:
             return "status_mismatch"
         if result and any(
             m.logical_id == pair.logical_id
-            for m in result.field_mismatches
-            if m.field.value not in ("start_time", "end_time")
+            for m in result.parameter_mismatches
+            if m.parameter not in ("actual_start", "actual_end")
         ):
             return "definition_mismatch"
         if result and pair in result.timing_deltas:
@@ -135,6 +150,19 @@ def _diff_kind(pair: JobPair, result: ComparisonResult | None = None) -> str:
     if pair.left:
         return "left_only"
     return "right_only"
+
+
+def _parameter_mismatch_summary(pair: JobPair, result: ComparisonResult | None) -> str:
+    if not result or not pair.logical_id:
+        return ""
+    names = sorted(
+        {
+            m.parameter
+            for m in result.parameter_mismatches
+            if m.logical_id == pair.logical_id
+        }
+    )
+    return ";".join(names)
 
 
 def export_comparison_csv(result: ComparisonResult) -> str:
@@ -154,7 +182,8 @@ def iter_comparison_rows(result: ComparisonResult):
             "right_name": pair.right.scheduler_job_name if pair.right else "",
             "left_status": pair.left.status.value if pair.left else "",
             "right_status": pair.right.status.value if pair.right else "",
-                "diff_kind": _diff_kind(pair, result),
+            "diff_kind": _diff_kind(pair, result),
+            "parameter_mismatches": _parameter_mismatch_summary(pair, result),
             "timing_delta_sec": _timing_delta_pair(pair),
             "match_confidence": pair.confidence.value,
         }

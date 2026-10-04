@@ -1,4 +1,4 @@
-# Process Scheduler jobs mirroring AutoSys definitions for migration parity.
+# Process Scheduler jobs with AutoSys-reference mapping blocks for migration parity.
 scheduler: process_scheduler
 topology_id: risk_daily_topology
 jobs:
@@ -9,12 +9,25 @@ jobs:
       expression: "0 6 * * *"
       calendar: every_day
       timezone: Europe/Zurich
-    command: null
-    condition: null
-    log_paths:
-      - /logs/ps/risk_daily_topology/run.log
-    resolved_command: null
-    resolved_parameters: {}
+    autosys_reference:
+      jil:
+        job_name: RISK_DAILY_BOX
+        job_type: BOX
+        owner: risk_ops@zia-batch01
+        permission: gx
+        group: RISK
+        application: RISK_ANALYTICS
+        date_conditions: y
+        start_times: "06:00"
+        days_of_week: all
+        run_calendar: every_day
+        timezone: Europe/Zurich
+        alarm_if_fail: 1
+        max_run_alarm: 120
+        n_retrys: 0
+        send_notification: N
+      run:
+        status: SUCCESS
 
   - name: RiskDaily.EtlJob
     path: [risk_daily_topology, RiskDaily.EtlJob]
@@ -30,6 +43,33 @@ jobs:
     resolved_command: "/opt/risk/bin/risk_etl.sh --business-date 2026-10-02"
     resolved_parameters:
       BusinessDate: "2026-10-02"
+    autosys_reference:
+      jil:
+        job_name: RISK_DAILY_ETL
+        job_type: CMD
+        box_name: RISK_DAILY_BOX
+        machine: zia-batch01
+        owner: risk_ops@zia-batch01
+        permission: gx
+        command: "/opt/risk/bin/risk_etl.sh --business-date {BusinessDate}"
+        condition: s(RISK_FILE_WAIT_INCOMING)
+        date_conditions: y
+        start_times: "06:05"
+        days_of_week: all
+        run_calendar: every_day
+        std_out_file: /logs/autosys/RISK_DAILY_ETL.out
+        std_err_file: /logs/autosys/RISK_DAILY_ETL.err
+        alarm_if_fail: 1
+        max_run_alarm: 90
+        n_retrys: 2
+        send_notification: Y
+        group: RISK
+        application: RISK_ANALYTICS
+      run:
+        status: SUCCESS
+        resolved_command: "/opt/risk/bin/risk_etl.sh --business-date 2026-10-02"
+        global_variables:
+          BUSINESS_DATE: "2026-10-02"
 
   - name: RiskDaily.FileWaitIncoming
     path: [risk_daily_topology, RiskDaily.FileWaitIncoming]
@@ -37,12 +77,36 @@ jobs:
     schedule:
       raw: "offset_minutes: 1"
     command: "/data/incoming/RISK_{BusinessDate}.done"
-    condition: null
     log_paths:
       - /logs/ps/RiskDaily.FileWaitIncoming.out
     resolved_command: "/data/incoming/RISK_2026-10-02.done"
     resolved_parameters:
       BusinessDate: "2026-10-02"
+    autosys_reference:
+      jil:
+        job_name: RISK_FILE_WAIT_INCOMING
+        job_type: FW
+        box_name: RISK_DAILY_BOX
+        machine: zia-batch01
+        owner: risk_ops@zia-batch01
+        permission: gx
+        watch_file: "/data/incoming/RISK_$${BUSINESS_DATE}.done"
+        date_conditions: y
+        start_mins: 1
+        days_of_week: all
+        run_calendar: every_day
+        std_out_file: /logs/autosys/RISK_FILE_WAIT_INCOMING.out
+        alarm_if_fail: 1
+        max_run_alarm: 30
+        n_retrys: 0
+        send_notification: N
+        group: RISK
+        application: RISK_ANALYTICS
+      run:
+        status: SUCCESS
+        resolved_watch_file: /data/incoming/RISK_2026-10-02.done
+        global_variables:
+          BUSINESS_DATE: "2026-10-02"
 
   - name: RiskDaily.DotNetCalc
     path: [risk_daily_topology, RiskDaily.DotNetCalc]
@@ -57,6 +121,33 @@ jobs:
     resolved_command: "dotnet /opt/risk/RiskCalc.dll --mode daily --date 2026-10-02"
     resolved_parameters:
       BusinessDate: "2026-10-02"
+    autosys_reference:
+      jil:
+        job_name: RISK_DOTNET_CALC
+        job_type: CMD
+        box_name: RISK_DAILY_BOX
+        machine: zia-batch01
+        owner: risk_ops@zia-batch01
+        permission: gx
+        command: "dotnet /opt/risk/RiskCalc.dll --mode daily --date $${BUSINESS_DATE}"
+        condition: s(RISK_DAILY_ETL)
+        date_conditions: y
+        start_times: "06:46"
+        days_of_week: all
+        run_calendar: every_day
+        std_out_file: /logs/autosys/RISK_DOTNET_CALC.out
+        std_err_file: /logs/autosys/RISK_DOTNET_CALC.err
+        alarm_if_fail: 1
+        max_run_alarm: 60
+        n_retrys: 1
+        send_notification: N
+        group: RISK
+        application: RISK_ANALYTICS
+      run:
+        status: SUCCESS
+        resolved_command: "dotnet /opt/risk/RiskCalc.dll --mode daily --date 2026-10-02"
+        global_variables:
+          BUSINESS_DATE: "2026-10-02"
 
   - name: RiskDaily.ReconJob
     path: [risk_daily_topology, RiskDaily.ReconJob]
@@ -72,6 +163,33 @@ jobs:
     resolved_command: "/opt/risk/bin/recon.sh --date 2026-10-02"
     resolved_parameters:
       BusinessDate: "2026-10-02"
+    autosys_reference:
+      jil:
+        job_name: RISK_DAILY_RECON
+        job_type: CMD
+        box_name: RISK_DAILY_BOX
+        machine: zia-batch01
+        owner: risk_ops@zia-batch01
+        permission: gx
+        command: "/opt/risk/bin/recon.sh --date $${BUSINESS_DATE}"
+        condition: s(RISK_DOTNET_CALC)
+        date_conditions: y
+        start_times: "06:50"
+        days_of_week: all
+        run_calendar: every_day
+        std_out_file: /logs/autosys/RISK_DAILY_RECON.out
+        std_err_file: /logs/autosys/RISK_DAILY_RECON.err
+        alarm_if_fail: 1
+        max_run_alarm: 45
+        n_retrys: 0
+        send_notification: Y
+        group: RISK
+        application: RISK_ANALYTICS
+      run:
+        status: SUCCESS
+        resolved_command: "/opt/risk/bin/recon.sh --date 2026-10-02"
+        global_variables:
+          BUSINESS_DATE: "2026-10-02"
 
   - name: RiskDaily.PostProcess
     path: [risk_daily_topology, RiskDaily.PostProcess]
@@ -83,8 +201,20 @@ jobs:
     condition: "Finish(RiskDaily.ReconJob)"
     log_paths:
       - /logs/ps/RiskDaily.PostProcess.log
-    resolved_command: null
-    resolved_parameters: {}
+    autosys_reference:
+      jil:
+        job_name: RISK_POST_PROCESS
+        job_type: CMD
+        box_name: RISK_DAILY_BOX
+        machine: zia-batch01
+        command: "dotnet /opt/risk/PostProcess.dll"
+        condition: s(RISK_DAILY_RECON)
+        date_conditions: y
+        start_times: "07:00"
+        days_of_week: all
+        run_calendar: every_day
+      run:
+        status: PENDING
 
   - name: RiskDaily.AdHocCheck
     path: [RiskDaily.AdHocCheck]
@@ -92,8 +222,14 @@ jobs:
     schedule:
       raw: on_demand
     command: "/opt/risk/bin/adhoc_check.sh"
-    condition: null
     log_paths:
       - /logs/ps/RiskDaily.AdHocCheck.log
-    resolved_command: null
-    resolved_parameters: {}
+    autosys_reference:
+      jil:
+        job_name: RISK_ADHOC_CHECK
+        job_type: CMD
+        machine: zia-batch01
+        command: "/opt/risk/bin/adhoc_check.sh"
+        date_conditions: n
+      run:
+        status: NOT_RUN

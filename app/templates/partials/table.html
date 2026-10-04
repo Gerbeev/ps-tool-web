@@ -46,23 +46,26 @@
       <th>Left status</th>
       <th>Right name</th>
       <th>Right status</th>
+      <th>Parameter Δ</th>
       <th>Confidence</th>
     </tr>
   </thead>
   <tbody>
     {% if not rows %}
-    <tr><td colspan="7" class="muted">No rows for this filter.</td></tr>
+    <tr><td colspan="8" class="muted">No rows for this filter.</td></tr>
     {% endif %}
     {% for row in rows %}
     {% if row.kind == 'pair' and row.pair %}
     {% set pair = row.pair %}
-    <tr class="{% if pair.left and pair.right and pair.left.status != pair.right.status %}row-mismatch{% endif %}">
-      <td>{% if pair.left and pair.right and pair.left.status == pair.right.status %}ok{% else %}Δ{% endif %}</td>
+    {% set param_delta = param_mismatches_by_id.get(pair.logical_id or '', []) if param_mismatches_by_id else [] %}
+    <tr class="{% if pair.left and pair.right and (pair.left.status != pair.right.status or param_delta) %}row-mismatch{% endif %}">
+      <td>{% if pair.left and pair.right and pair.left.status == pair.right.status and not param_delta %}ok{% else %}Δ{% endif %}</td>
       <td><code>{{ pair.logical_id or '—' }}</code></td>
       <td>{{ pair.left.scheduler_job_name if pair.left else '—' }}</td>
       <td><span class="{{ job_status_css(pair.left.status) if pair.left else '' }}">{{ pair.left.status.value if pair.left else '—' }}</span></td>
       <td>{{ pair.right.scheduler_job_name if pair.right else '—' }}</td>
       <td><span class="{{ job_status_css(pair.right.status) if pair.right else '' }}">{{ pair.right.status.value if pair.right else '—' }}</span></td>
+      <td class="param-delta">{% if param_delta %}<ul class="param-mismatch-list">{% for m in param_delta %}<li><code>{{ m.parameter }}</code></li>{% endfor %}</ul>{% else %}—{% endif %}</td>
       <td>{{ pair.confidence.value }}</td>
     </tr>
     {% elif row.kind == 'left_only' and row.job %}

@@ -1,0 +1,33 @@
+# AutoSys JIL / run attributes used for migration parity comparison.
+# Parameter names must match Broadcom AE JIL attribute names or documented run fields.
+timing_threshold_sec: 60
+
+jil_parameters:
+  - job_type
+  - machine
+  - box_name
+  - command
+  - watch_file
+  - condition
+  - date_conditions
+  - start_times
+  - start_mins
+  - days_of_week
+  - run_calendar
+  - timezone
+  - std_out_file
+  - std_err_file
+  - owner
+  - permission
+  - group
+  - application
+  - alarm_if_fail
+  - max_run_alarm
+  - n_retrys
+  - send_notification
+
+run_parameters:
+  - status
+  - resolved_command
+  - actual_start
+  - actual_end

@@ -23,7 +23,7 @@ Default demo: **UAT AutoSys (left)** vs **Test Process Scheduler (right)**, busi
 - Left-only legacy report job
 - Right-only ad hoc / post-process jobs
 - Timing deltas on several paired jobs
-- Definition parity fields on `NormalizedJob` (schedule, command, condition, logs, resolved command) — see `docs/job-field-mapping.md`
+- AutoSys-reference parameter parity (`SnapshotJob.autosys`) — see `docs/autosys-compare-parameters.md`
 
 Sample job payloads loaded by mock adapters: `examples/autosys_jobs.sample.yaml`, `examples/process_scheduler_jobs.sample.yaml`.
 
@@ -33,6 +33,7 @@ Sample job payloads loaded by mock adapters: `examples/autosys_jobs.sample.yaml`
 |------|---------|
 | `config/environments.yaml` | Environment ids and display names |
 | `config/identity_map.yaml` | AutoSys ↔ PS name pairs and regex rules |
+| `config/autosys_compare_parameters.yaml` | JIL/run attributes compared for migration parity |
 | `.env` | Host/port, cache TTL, `USE_MOCK_ADAPTERS`, paths |
 
 Secrets stay out of git; reference connector profiles in YAML and load credentials from env/vault in real adapters.
@@ -42,7 +43,7 @@ Secrets stay out of git; reference connector profiles in YAML and load credentia
 1. Implement `SchedulerAdapter` in `app/adapters/base.py` (see spec §5.2).
 2. Wrap existing modules (e.g. `connectors.autosys`, `connectors.process_scheduler`) in new classes under `app/adapters/`.
 3. Update `get_adapter()` in `app/adapters/factory.py` to select real vs mock based on `USE_MOCK_ADAPTERS` and `connector_profile` from `environments.yaml`.
-4. Map native statuses to `JobStatus` and populate `NormalizedJob` / `DependencyEdge` in `fetch_topology()`.
+4. Map native statuses to `JobStatus` and populate `SnapshotJob` (with `AutoSysJobReference`) / `DependencyEdge` in `fetch_topology()`.
 
 ## API (selected)
 
