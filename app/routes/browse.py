@@ -7,6 +7,11 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from app.adapters.factory import get_adapter
+from app.browse_status_filters import (
+    BROWSE_STATUS_FILTER_ORDER,
+    BROWSE_STATUS_INACTIVE_VALUES,
+    BROWSE_STATUS_LABELS,
+)
 from app.config import load_environments
 from app.models import AsOf, AsOfKind, ComparisonContext, ContextFilters, SchedulerType
 from app.search.sqlite_fts import search_index
@@ -18,6 +23,9 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 templates.env.globals["job_status_css"] = job_status_css
 templates.env.globals["tree_child_count"] = child_count
+templates.env.globals["browse_status_labels"] = BROWSE_STATUS_LABELS
+templates.env.globals["browse_status_inactive_values"] = BROWSE_STATUS_INACTIVE_VALUES
+templates.env.globals["browse_status_filter_order"] = BROWSE_STATUS_FILTER_ORDER
 
 
 def _env_options():

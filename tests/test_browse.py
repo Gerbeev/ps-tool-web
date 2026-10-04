@@ -5,6 +5,7 @@ import re
 from fastapi.testclient import TestClient
 
 from app.main import app
+from app.models import JobStatus
 
 client = TestClient(app)
 
@@ -33,6 +34,10 @@ def test_browse_load_returns_full_width_tree_and_lazy_nodes():
     assert "browse-tree-toolbar" in html
     assert 'id="browse-filter-search"' in html
     assert 'id="browse-filter-status"' in html
+    assert 'value="inactive"' in html
+    assert 'data-inactive-statuses="' in html
+    for status in JobStatus:
+        assert f'value="{status.value}"' in html
     assert "browse-job-row" in html
     assert 'data-job-name="' in html
     assert 'data-status="' in html

@@ -1,5 +1,17 @@
 (function () {
-  var INACTIVE_STATUSES = ['pending', 'not_run', 'disabled', 'killed', 'unknown'];
+  function inactiveStatuses() {
+    var statusEl = document.getElementById('browse-filter-status');
+    if (!statusEl) {
+      return ['pending', 'not_run', 'disabled', 'killed', 'unknown'];
+    }
+    var raw = statusEl.getAttribute('data-inactive-statuses') || '';
+    return raw
+      .split(',')
+      .map(function (s) {
+        return s.trim();
+      })
+      .filter(Boolean);
+  }
 
   function getPane() {
     return document.querySelector('.browse-tree-pane');
@@ -19,7 +31,7 @@
     }
     var status = row.getAttribute('data-status') || '';
     if (statusFilter === 'inactive') {
-      return INACTIVE_STATUSES.indexOf(status) !== -1;
+      return inactiveStatuses().indexOf(status) !== -1;
     }
     return status === statusFilter;
   }

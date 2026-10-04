@@ -2,7 +2,7 @@
 {% from 'macros/tree_browse.html' import render_browse_nodes %}
 <div class="tree-pane browse-tree-pane">
   <div class="browse-tree-toolbar" role="search" aria-label="Filter jobs">
-    <label class="browse-filter-field">
+    <label class="browse-filter-field browse-filter-field-search">
       <span class="browse-filter-label">Search</span>
       <input type="search"
              id="browse-filter-search"
@@ -13,12 +13,19 @@
     </label>
     <label class="browse-filter-field browse-filter-field-status">
       <span class="browse-filter-label">Status</span>
-      <select id="browse-filter-status" class="browse-filter-select" aria-label="Filter by status">
+      <select id="browse-filter-status"
+              class="browse-filter-select"
+              aria-label="Filter by status"
+              data-inactive-statuses="{{ browse_status_inactive_values|join(',') }}">
         <option value="all">All statuses</option>
-        <option value="success">Success</option>
-        <option value="failure">Failure</option>
-        <option value="running">Running</option>
-        <option value="inactive">Inactive</option>
+        <optgroup label="Groups">
+          <option value="inactive">Inactive (pending, not run, disabled, killed, unknown)</option>
+        </optgroup>
+        <optgroup label="By status">
+          {% for status in browse_status_filter_order %}
+          <option value="{{ status.value }}">{{ browse_status_labels[status] }}</option>
+          {% endfor %}
+        </optgroup>
       </select>
     </label>
   </div>
