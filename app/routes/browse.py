@@ -148,7 +148,7 @@ async def browse_job_detail(request: Request, uid: str, session_id: str):
 
 
 @router.get("/api/browse/tree", response_class=HTMLResponse)
-async def browse_tree(request: Request, session_id: str, parent_uid: str = ""):
+async def browse_tree(request: Request, session_id: str, parent_uid: str = "", depth: int = 0):
     session = session_store.get_browse(session_id)
     if not session:
         return HTMLResponse("<p>Session expired. Load the environment again.</p>", status_code=404)
@@ -166,5 +166,6 @@ async def browse_tree(request: Request, session_id: str, parent_uid: str = ""):
             "snapshot": snap,
             "tree_api_base": "/api/browse/tree",
             "job_api_base": "/api/browse/job",
+            "depth": depth,
         },
     )

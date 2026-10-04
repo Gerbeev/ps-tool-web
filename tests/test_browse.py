@@ -31,6 +31,7 @@ def test_browse_load_returns_full_width_tree_and_lazy_nodes():
     assert "browse-workspace" in html
     assert "browse-tree-header" in html
     assert "browse-job-row" in html
+    assert "browse-tree-expand-btn" in html
     assert 'hx-trigger="revealed once"' in html
 
     m = re.search(r'id="session-id"[^>]*value="([^"]+)"', html)

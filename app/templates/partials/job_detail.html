@@ -8,7 +8,7 @@
     <button type="button"
             class="icon-btn job-detail-close"
             aria-label="Close job details"
-            onclick="var p=document.getElementById('job-detail-panel'); if(p){p.innerHTML='';} var w=document.getElementById('browse-workspace'); if(w){w.classList.remove('browse-panel-open');} document.querySelectorAll('.browse-job-row.is-selected').forEach(function (el) { el.classList.remove('is-selected'); });">×</button>
+            onclick="window.psBrowseClosePanel && window.psBrowseClosePanel();">×</button>
   </header>
   {% else %}
   <header>{{ side|upper }} · {{ job.scheduler_job_name }}</header>

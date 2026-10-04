@@ -10,12 +10,38 @@
   </div>
   <aside id="job-detail-panel" class="browse-detail-panel" aria-live="polite"></aside>
 </div>
+<div id="browse-panel-backdrop" class="browse-panel-backdrop" hidden aria-hidden="true"></div>
 <script>
   (function () {
     var search = document.getElementById('global-search');
     if (search) {
       search.disabled = false;
       search.placeholder = 'Search jobs in this browse… (Ctrl+K)';
+    }
+    window.psBrowseOpenPanel = function (row) {
+      var workspace = document.getElementById('browse-workspace');
+      var backdrop = document.getElementById('browse-panel-backdrop');
+      if (workspace) workspace.classList.add('browse-panel-open');
+      if (backdrop) backdrop.removeAttribute('hidden');
+      document.querySelectorAll('.browse-job-row.is-selected').forEach(function (el) {
+        el.classList.remove('is-selected');
+      });
+      if (row) row.classList.add('is-selected');
+    };
+    window.psBrowseClosePanel = function () {
+      var panel = document.getElementById('job-detail-panel');
+      var workspace = document.getElementById('browse-workspace');
+      var backdrop = document.getElementById('browse-panel-backdrop');
+      if (panel) panel.innerHTML = '';
+      if (workspace) workspace.classList.remove('browse-panel-open');
+      if (backdrop) backdrop.setAttribute('hidden', '');
+      document.querySelectorAll('.browse-job-row.is-selected').forEach(function (el) {
+        el.classList.remove('is-selected');
+      });
+    };
+    var backdrop = document.getElementById('browse-panel-backdrop');
+    if (backdrop) {
+      backdrop.addEventListener('click', window.psBrowseClosePanel);
     }
   })();
 </script>

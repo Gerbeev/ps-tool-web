@@ -2,19 +2,23 @@
 {% from 'macros/tree_browse.html' import render_browse_nodes %}
 <div class="tree-pane browse-tree-pane">
   <div class="browse-tree-header" aria-hidden="true">
+    <span class="browse-col browse-col-expand"></span>
     <span class="browse-col browse-col-name">Job</span>
     <span class="browse-col browse-col-status">Status</span>
     <span class="browse-col browse-col-start">Start</span>
     <span class="browse-col browse-col-end">End</span>
   </div>
+  <div class="browse-tree-body">
   {% set display_roots = roots if roots is defined else snapshot.roots %}
   {{ render_browse_nodes(
       display_roots,
       session_id,
       snapshot,
       tree_api_base|default('/api/browse/tree'),
-      job_api_base|default('/api/browse/job')
+      job_api_base|default('/api/browse/job'),
+      depth|default(0)
   ) }}
+  </div>
 </div>
 {% else %}
 {% from 'macros/tree_lazy.html' import render_lazy_nodes %}
