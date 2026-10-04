@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
+from app.config import get_settings
 from app.models import (
     ComparisonContext,
     DependencyEdge,
@@ -64,8 +65,149 @@ def _parse_business_date(context: ComparisonContext) -> datetime:
         return datetime(2026, 10, 2, 6, 0, 0)
 
 
+def apply_root_scope(snap: TopologySnapshot, root_name: str | None) -> TopologySnapshot:
+    """Keep only the subtree rooted at root_name (root box / topology id)."""
+    if not root_name or not str(root_name).strip():
+        return snap
+    key = str(root_name).strip().lower()
+
+    def node_matches(node: JobNode) -> bool:
+        job = node.job
+        if job.scheduler_job_name.lower() == key:
+            return True
+        return any(label.lower() == key for label in job.path_labels)
+
+    def find_subtree(nodes: list[JobNode]) -> JobNode | None:
+        for node in nodes:
+            if node_matches(node):
+                return node
+            found = find_subtree(node.children)
+            if found:
+                return found
+        return None
+
+    subtree = find_subtree(snap.roots)
+    if not subtree:
+        return snap
+
+    flat: list[NormalizedJob] = []
+    edges: list[DependencyEdge] = []
+
+    def flatten(node: JobNode) -> None:
+        flat.append(node.job)
+        for child in node.children:
+            flatten(child)
+
+    flatten(subtree)
+    allowed = {j.job_uid for j in flat}
+    edges = [e for e in snap.edges if e.from_uid in allowed and e.to_uid in allowed]
+    return TopologySnapshot(
+        context=snap.context,
+        roots=[subtree],
+        flat_jobs=flat,
+        edges=edges,
+        metadata={**snap.metadata, "scoped_root": root_name},
+    )
+
+
+def build_large_autosys_snapshot(context: ComparisonContext, job_count: int) -> TopologySnapshot:
+    """Synthetic flat box with many child jobs for scalability testing."""
+    base = _parse_business_date(context)
+    side = "left"
+    n = max(job_count, 2)
+    box = _job(
+        side,
+        "RISK_DAILY_BOX",
+        ["RISK_DAILY_BOX"],
+        "box",
+        JobStatus.SUCCESS,
+        "SUCCESS",
+        start=base,
+        end=base + timedelta(hours=2),
+    )
+    children: list[JobNode] = []
+    flat: list[NormalizedJob] = [box]
+    edges: list[DependencyEdge] = []
+    for i in range(n - 1):
+        status = JobStatus.FAILURE if i % 500 == 17 else JobStatus.SUCCESS
+        job = _job(
+            side,
+            f"RISK_JOB_{i:04d}",
+            ["RISK_DAILY_BOX", f"RISK_JOB_{i:04d}"],
+            "cmd",
+            status,
+            status.value,
+            parent_uid=box.job_uid,
+            start=base + timedelta(minutes=1),
+            end=base + timedelta(minutes=2),
+        )
+        flat.append(job)
+        children.append(JobNode(job=job))
+        edges.append(DependencyEdge(from_uid=box.job_uid, to_uid=job.job_uid))
+    return TopologySnapshot(
+        context=context,
+        roots=[JobNode(job=box, children=children)],
+        flat_jobs=flat,
+        edges=edges,
+        metadata={"adapter": "autosys_mock", "connector_version": "0.0-mock", "synthetic_count": n},
+    )
+
+
+def build_large_ps_snapshot(context: ComparisonContext, job_count: int) -> TopologySnapshot:
+    """Synthetic PS topology aligned with large AutoSys mock."""
+    base = _parse_business_date(context)
+    side = "right"
+    n = max(job_count, 2)
+    topo = _job(
+        side,
+        "risk_daily_topology",
+        ["risk_daily_topology"],
+        "topology",
+        JobStatus.SUCCESS,
+        "Completed",
+        start=base,
+        end=base + timedelta(hours=2),
+    )
+    children: list[JobNode] = []
+    flat: list[NormalizedJob] = [topo]
+    edges: list[DependencyEdge] = []
+    for i in range(n - 1):
+        # Deliberate status drift on a subset vs AutoSys mock.
+        status = JobStatus.SUCCESS if i % 500 != 17 else JobStatus.FAILURE
+        job = _job(
+            side,
+            f"RiskDaily.Job_{i:04d}",
+            ["risk_daily_topology", f"RiskDaily.Job_{i:04d}"],
+            "dotnet",
+            status,
+            "Completed" if status == JobStatus.SUCCESS else "Failed",
+            parent_uid=topo.job_uid,
+        )
+        flat.append(job)
+        children.append(JobNode(job=job))
+        edges.append(DependencyEdge(from_uid=topo.job_uid, to_uid=job.job_uid))
+    return TopologySnapshot(
+        context=context,
+        roots=[JobNode(job=topo, children=children)],
+        flat_jobs=flat,
+        edges=edges,
+        metadata={
+            "adapter": "process_scheduler_mock",
+            "connector_version": "0.0-mock",
+            "topology_id": "risk_daily_topology",
+            "synthetic_count": n,
+        },
+    )
+
+
 def build_autosys_snapshot(context: ComparisonContext) -> TopologySnapshot:
     """Realistic Risk Analytics AutoSys box tree for demos."""
+    settings = get_settings()
+    if settings.mock_job_count > 0:
+        return apply_root_scope(
+            build_large_autosys_snapshot(context, settings.mock_job_count),
+            context.filters.root_box,
+        )
     base = _parse_business_date(context)
     side = "left"
     business_date = context.as_of.value or base.strftime("%Y-%m-%d")
@@ -159,7 +301,7 @@ def build_autosys_snapshot(context: ComparisonContext) -> TopologySnapshot:
         DependencyEdge(from_uid=dotnet.job_uid, to_uid=recon.job_uid),
         DependencyEdge(from_uid=box.job_uid, to_uid=legacy_only.job_uid),
     ]
-    return TopologySnapshot(
+    snap = TopologySnapshot(
         context=context,
         roots=roots,
         flat_jobs=flat,
@@ -170,6 +312,7 @@ def build_autosys_snapshot(context: ComparisonContext) -> TopologySnapshot:
             "business_date": business_date,
         },
     )
+    return apply_root_scope(snap, context.filters.root_box)
 
 
 def _ps_topology_id(context: ComparisonContext) -> str:
@@ -344,10 +487,17 @@ def build_ps_daily_snapshot(context: ComparisonContext) -> TopologySnapshot:
 
 
 def build_ps_snapshot(context: ComparisonContext) -> TopologySnapshot:
+    settings = get_settings()
+    if settings.mock_job_count > 0:
+        scoped = context.filters.root_box or context.filters.topology_id
+        return apply_root_scope(build_large_ps_snapshot(context, settings.mock_job_count), scoped)
     topo_id = _ps_topology_id(context)
     if topo_id == "risk_weekly_topology":
-        return build_ps_weekly_snapshot(context)
-    return build_ps_daily_snapshot(context)
+        snap = build_ps_weekly_snapshot(context)
+    else:
+        snap = build_ps_daily_snapshot(context)
+    scoped = context.filters.root_box or context.filters.topology_id
+    return apply_root_scope(snap, scoped)
 
 
 def list_ps_topology_names() -> list[str]:

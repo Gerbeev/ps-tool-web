@@ -7,25 +7,40 @@
      href="/api/export/right.csv?session_id={{ session_id }}">Export Right CSV</a>
   <a role="button" class="outline"
      href="/api/export/comparison.csv?session_id={{ session_id }}">Export comparison CSV</a>
-  <input type="hidden" id="session-id" value="{{ session_id }}">
+  <input type="hidden" id="session-id" name="session_id" value="{{ session_id }}">
 </div>
 
-<div class="tabs">
-  <details open>
+<div class="tabs compare-tabs">
+  <details>
     <summary>Trees</summary>
-    <div class="split-pane">
-      {% with snapshot=left_snapshot, side='left', mismatch_ids=result.status_mismatches %}
-      {% include "partials/tree_side.html" %}
-      {% endwith %}
-      {% with snapshot=right_snapshot, side='right', mismatch_ids=result.status_mismatches %}
-      {% include "partials/tree_side.html" %}
-      {% endwith %}
+    <div class="compare-trees-loader"
+         hx-get="/api/compare/trees?session_id={{ session_id }}"
+         hx-trigger="revealed once"
+         hx-target="this"
+         hx-swap="innerHTML">
+      <p class="muted small">Open to load topology trees…</p>
     </div>
   </details>
   <details open>
     <summary>Table</summary>
-    {% include "partials/table.html" %}
+    <div id="compare-table-panel"
+         hx-get="/api/compare/table?session_id={{ session_id }}&filter={{ table_filter|default('all') }}&limit={{ table_limit|default(0) }}"
+         hx-trigger="load"
+         hx-target="this"
+         hx-swap="innerHTML">
+      <p class="muted small">Loading table…</p>
+    </div>
   </details>
 </div>
 
 <section id="job-detail-panel" class="job-detail-panel"></section>
+
+<script>
+  (function () {
+    var search = document.getElementById('global-search');
+    if (search) {
+      search.disabled = false;
+      search.placeholder = 'Search jobs in this compare… (Ctrl+K)';
+    }
+  })();
+</script>

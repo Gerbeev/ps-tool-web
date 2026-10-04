@@ -1,17 +1,29 @@
 <div class="summary-cards grid">
-  <article>
+  <article class="summary-card-clickable"
+           hx-get="/api/compare/table?session_id={{ session_id }}&filter=matched&limit=0"
+           hx-target="#compare-table-panel"
+           hx-swap="innerHTML">
     <header>Matched</header>
     <p class="card-value">{{ result.summary.matched }}</p>
   </article>
-  <article class="card-warn">
+  <article class="summary-card-clickable card-warn"
+           hx-get="/api/compare/table?session_id={{ session_id }}&filter=status_delta&limit=0"
+           hx-target="#compare-table-panel"
+           hx-swap="innerHTML">
     <header>Status Δ</header>
     <p class="card-value">{{ result.summary.mismatched_status }}</p>
   </article>
-  <article class="card-left-only">
+  <article class="summary-card-clickable card-left-only"
+           hx-get="/api/compare/table?session_id={{ session_id }}&filter=left_only&limit=0"
+           hx-target="#compare-table-panel"
+           hx-swap="innerHTML">
     <header>Left only</header>
     <p class="card-value">{{ result.summary.left_only_count }}</p>
   </article>
-  <article class="card-right-only">
+  <article class="summary-card-clickable card-right-only"
+           hx-get="/api/compare/table?session_id={{ session_id }}&filter=right_only&limit=0"
+           hx-target="#compare-table-panel"
+           hx-swap="innerHTML">
     <header>Right only</header>
     <p class="card-value">{{ result.summary.right_only_count }}</p>
   </article>
@@ -19,4 +31,12 @@
 <p class="muted small">
   Left jobs: {{ result.summary.total_left }} · Right jobs: {{ result.summary.total_right }}
   · Snapshots {{ result.left_snapshot_id[:8] }} / {{ result.right_snapshot_id[:8] }}
+  · <button type="button" class="link-btn"
+            hx-get="/api/compare/table?session_id={{ session_id }}&filter=mismatches&limit=0"
+            hx-target="#compare-table-panel"
+            hx-swap="innerHTML">Show diffs only</button>
+  · <button type="button" class="link-btn"
+            hx-get="/api/compare/table?session_id={{ session_id }}&filter=all&limit=0"
+            hx-target="#compare-table-panel"
+            hx-swap="innerHTML">Show all rows</button>
 </p>

@@ -16,7 +16,14 @@ class SearchIndex(ABC):
     def rebuild(self, snapshot: TopologySnapshot, side: str) -> None: ...
 
     @abstractmethod
-    def search(self, query: str, limit: int = 50) -> list[SearchHit]: ...
+    def search(
+        self,
+        query: str,
+        limit: int = 50,
+        *,
+        snapshot_ids: list[str] | None = None,
+        side: str | None = None,
+    ) -> list[SearchHit]: ...
 
 
 def _glob_to_fts(query: str) -> str:
@@ -94,23 +101,38 @@ class SQLiteFTSSearchIndex(SearchIndex):
             )
         self._conn.commit()
 
-    def search(self, query: str, limit: int = 50) -> list[SearchHit]:
+    def search(
+        self,
+        query: str,
+        limit: int = 50,
+        *,
+        snapshot_ids: list[str] | None = None,
+        side: str | None = None,
+    ) -> list[SearchHit]:
         fts_q = _glob_to_fts(query)
         if not fts_q:
             return []
+        if snapshot_ids is not None and not snapshot_ids:
+            return []
         cur = self._conn.cursor()
-        try:
-            cur.execute(
-                """
+        sql = """
                 SELECT job_uid, side, snapshot_id, name, path, status, body,
                        bm25(jobs_fts) AS rank
                 FROM jobs_fts
                 WHERE jobs_fts MATCH ?
-                ORDER BY rank
-                LIMIT ?
-                """,
-                (fts_q, limit),
-            )
+                """
+        params: list[object] = [fts_q]
+        if snapshot_ids:
+            placeholders = ",".join("?" for _ in snapshot_ids)
+            sql += f" AND snapshot_id IN ({placeholders})"
+            params.extend(snapshot_ids)
+        if side:
+            sql += " AND side = ?"
+            params.append(side)
+        sql += " ORDER BY rank LIMIT ?"
+        params.append(limit)
+        try:
+            cur.execute(sql, params)
         except sqlite3.OperationalError:
             return []
         hits: list[SearchHit] = []
