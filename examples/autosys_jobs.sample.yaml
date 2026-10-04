@@ -1,0 +1,87 @@
+# Representative AutoSys job definitions (Risk Analytics daily box).
+# Used by mock adapters and as documentation for field mapping.
+scheduler: autosys
+jobs:
+  - name: RISK_DAILY_BOX
+    path: [RISK_DAILY_BOX]
+    job_type: box
+    schedule:
+      expression: "0 6 * * *"
+      calendar: every_day
+      timezone: Europe/Zurich
+    command: null
+    condition: null
+    log_paths:
+      - /logs/autosys/RISK_DAILY_BOX.jil
+    resolved_command: null
+    resolved_parameters: {}
+
+  - name: RISK_DAILY_ETL
+    path: [RISK_DAILY_BOX, RISK_DAILY_ETL]
+    job_type: cmd
+    schedule:
+      expression: "5 6 * * *"
+      calendar: every_day
+    command: "/opt/risk/bin/risk_etl.sh --business-date %%$DATE%%"
+    condition: "s(RISK_FILE_WAIT_INCOMING)"
+    log_paths:
+      - /logs/autosys/RISK_DAILY_ETL.log
+      - /logs/autosys/RISK_DAILY_ETL.err
+    resolved_command: "/opt/risk/bin/risk_etl.sh --business-date 2026-10-02"
+    resolved_parameters:
+      DATE: "2026-10-02"
+
+  - name: RISK_FILE_WAIT_INCOMING
+    path: [RISK_DAILY_BOX, RISK_FILE_WAIT_INCOMING]
+    job_type: fw
+    schedule:
+      raw: "start_mins: 1"
+    command: "/data/incoming/RISK_%%$DATE%%.done"
+    condition: null
+    log_paths:
+      - /logs/autosys/RISK_FILE_WAIT_INCOMING.log
+    resolved_command: "/data/incoming/RISK_2026-10-02.done"
+    resolved_parameters:
+      DATE: "2026-10-02"
+
+  - name: RISK_DOTNET_CALC
+    path: [RISK_DAILY_BOX, RISK_DOTNET_CALC]
+    job_type: cmd
+    schedule:
+      expression: "46 6 * * *"
+      calendar: every_day
+    command: "dotnet /opt/risk/RiskCalc.dll --mode daily --date %%$DATE%%"
+    condition: "s(RISK_DAILY_ETL)"
+    log_paths:
+      - /logs/autosys/RISK_DOTNET_CALC.log
+    resolved_command: "dotnet /opt/risk/RiskCalc.dll --mode daily --date 2026-10-02"
+    resolved_parameters:
+      DATE: "2026-10-02"
+
+  - name: RISK_DAILY_RECON
+    path: [RISK_DAILY_BOX, RISK_DAILY_RECON]
+    job_type: cmd
+    schedule:
+      expression: "50 6 * * *"
+      calendar: every_day
+    command: "/opt/risk/bin/recon.sh --date %%$DATE%%"
+    condition: "s(RISK_DOTNET_CALC)"
+    log_paths:
+      - /logs/autosys/RISK_DAILY_RECON.log
+      - /logs/autosys/RISK_DAILY_RECON.err
+    resolved_command: "/opt/risk/bin/recon.sh --date 2026-10-02"
+    resolved_parameters:
+      DATE: "2026-10-02"
+
+  - name: RISK_LEGACY_REPORT
+    path: [RISK_DAILY_BOX, RISK_LEGACY_REPORT]
+    job_type: cmd
+    schedule:
+      expression: "56 6 * * 1-5"
+      calendar: weekdays
+    command: "/opt/risk/legacy/report.sh"
+    condition: "s(RISK_DAILY_RECON)"
+    log_paths:
+      - /logs/autosys/RISK_LEGACY_REPORT.log
+    resolved_command: "/opt/risk/legacy/report.sh"
+    resolved_parameters: {}

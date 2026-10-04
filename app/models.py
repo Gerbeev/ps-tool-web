@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class SchedulerType(str, Enum):
@@ -63,7 +63,46 @@ class ComparisonContext(BaseModel):
     filters: ContextFilters = Field(default_factory=ContextFilters)
 
 
+class JobSchedule(BaseModel):
+    """Normalized schedule: cron/calendar string and optional structure.
+
+    AutoSys: ``run_calendar``, ``start_times`` / ``run_window``, ``days_of_week``.
+    Process Scheduler: cron expression or calendar id on the job definition.
+    """
+
+    expression: str | None = None
+    calendar: str | None = None
+    timezone: str | None = None
+    raw: str | None = None
+
+    def comparable(self) -> str:
+        """Single string for parity comparison across schedulers."""
+        parts = [p for p in (self.expression, self.calendar, self.timezone) if p]
+        if parts:
+            return "|".join(parts)
+        return (self.raw or "").strip()
+
+
+class ComparedField(str, Enum):
+    STATUS = "status"
+    SCHEDULE = "schedule"
+    COMMAND = "command"
+    CONDITION = "condition"
+    LOG_PATHS = "log_paths"
+    RESOLVED_COMMAND = "resolved_command"
+    START_TIME = "start_time"
+    END_TIME = "end_time"
+
+
 class NormalizedJob(BaseModel):
+    """Unified job metadata + last-run instance fields for snapshots and diff.
+
+    Identity: ``scheduler_job_name``, ``logical_id``, ``path_labels``.
+    Definition (migration parity): ``schedule``, ``command``, ``condition``, ``log_paths``.
+    Run instance: ``status``, ``actual_start`` / ``actual_end`` (start/end time),
+    ``resolved_command``, ``resolved_parameters`` (substituted command line).
+    """
+
     job_uid: str
     logical_id: str | None = None
     scheduler_job_name: str
@@ -78,9 +117,31 @@ class NormalizedJob(BaseModel):
     duration_sec: float | None = None
     exit_code: int | None = None
     machine: str | None = None
+    schedule: JobSchedule | None = None
+    command: str | None = None
+    condition: str | None = None
+    log_paths: list[str] = Field(default_factory=list)
+    resolved_command: str | None = None
+    resolved_parameters: dict[str, Any] = Field(default_factory=dict)
     log_path: str | None = None
     attributes: dict[str, Any] = Field(default_factory=dict)
     path_labels: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def _sync_log_paths(self) -> NormalizedJob:
+        if self.log_paths and not self.log_path:
+            object.__setattr__(self, "log_path", self.log_paths[0])
+        elif self.log_path and not self.log_paths:
+            object.__setattr__(self, "log_paths", [self.log_path])
+        return self
+
+    @property
+    def start_time(self) -> datetime | None:
+        return self.actual_start
+
+    @property
+    def end_time(self) -> datetime | None:
+        return self.actual_end
 
 
 class DependencyEdge(BaseModel):
@@ -113,11 +174,24 @@ class JobPair(BaseModel):
     logical_id: str | None = None
 
 
+class FieldMismatch(BaseModel):
+    logical_id: str | None = None
+    field: ComparedField
+    left_value: str = ""
+    right_value: str = ""
+
+
 class ComparisonSummary(BaseModel):
     total_left: int = 0
     total_right: int = 0
     matched: int = 0
     mismatched_status: int = 0
+    mismatched_schedule: int = 0
+    mismatched_command: int = 0
+    mismatched_condition: int = 0
+    mismatched_log_paths: int = 0
+    mismatched_resolved_command: int = 0
+    mismatched_timing: int = 0
     left_only_count: int = 0
     right_only_count: int = 0
 
@@ -130,6 +204,8 @@ class ComparisonResult(BaseModel):
     right_only: list[NormalizedJob] = Field(default_factory=list)
     status_mismatches: list[JobPair] = Field(default_factory=list)
     timing_deltas: list[JobPair] = Field(default_factory=list)
+    definition_mismatches: list[JobPair] = Field(default_factory=list)
+    field_mismatches: list[FieldMismatch] = Field(default_factory=list)
     summary: ComparisonSummary = Field(default_factory=ComparisonSummary)
 
 
