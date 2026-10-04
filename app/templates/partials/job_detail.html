@@ -1,28 +1,75 @@
-<article>
+<article class="job-detail-card{% if panel_mode == 'browse' %} job-detail-card--browse{% endif %}">
+  {% if panel_mode == 'browse' %}
+  <header class="job-detail-card-header">
+    <div>
+      <p class="job-detail-kicker">Job details</p>
+      <h3>{{ job.scheduler_job_name }}</h3>
+    </div>
+    <button type="button"
+            class="icon-btn job-detail-close"
+            aria-label="Close job details"
+            onclick="window.psBrowseClosePanel && window.psBrowseClosePanel();">×</button>
+  </header>
+  {% else %}
   <header>{{ side|upper }} · {{ job.scheduler_job_name }}</header>
-  <dl>
-    <dt>Status</dt><dd class="{{ job_status_css(job.status) }}">{{ job.status.value }} ({{ job.status_raw }})</dd>
-    <dt>Logical ID</dt><dd><code>{{ job.logical_id or '—' }}</code></dd>
-    <dt>Type (JIL job_type)</dt><dd>{{ job.autosys.jil.job_type or job.job_type or '—' }}</dd>
-    <dt>Path</dt><dd><code>/{{ job.path_labels|join('/') }}</code></dd>
-    <dt>Start</dt><dd>{{ job.actual_start or '—' }}</dd>
-    <dt>End</dt><dd>{{ job.actual_end or '—' }}</dd>
-    <dt>Duration (s)</dt><dd>{{ job.duration_sec or '—' }}</dd>
-    <dt>Exit code</dt><dd>{{ job.exit_code if job.exit_code is not none else '—' }}</dd>
-    <dt>machine</dt><dd>{{ job.autosys.jil.machine or '—' }}</dd>
-    <dt>box_name</dt><dd>{{ job.autosys.jil.box_name or '—' }}</dd>
-    <dt>date_conditions</dt><dd>{{ job.autosys.jil.date_conditions or '—' }}</dd>
-    <dt>start_times</dt><dd><code>{{ job.autosys.jil.start_times or '—' }}</code></dd>
-    <dt>start_mins</dt><dd>{{ job.autosys.jil.start_mins or '—' }}</dd>
-    <dt>days_of_week</dt><dd>{{ job.autosys.jil.days_of_week or '—' }}</dd>
-    <dt>run_calendar</dt><dd>{{ job.autosys.jil.run_calendar or '—' }}</dd>
-    <dt>timezone</dt><dd>{{ job.autosys.jil.timezone or '—' }}</dd>
-    <dt>command</dt><dd><code>{{ job.autosys.jil.command or '—' }}</code></dd>
-    <dt>watch_file</dt><dd><code>{{ job.autosys.jil.watch_file or '—' }}</code></dd>
-    <dt>condition</dt><dd><code>{{ job.autosys.jil.condition or '—' }}</code></dd>
-    <dt>std_out_file</dt><dd><code>{{ job.autosys.jil.std_out_file or '—' }}</code></dd>
-    <dt>std_err_file</dt><dd><code>{{ job.autosys.jil.std_err_file or '—' }}</code></dd>
-    <dt>resolved_command (run)</dt><dd><code>{{ job.autosys.run.resolved_command or '—' }}</code></dd>
-    <dt>run status</dt><dd>{{ job.autosys.run.status or '—' }}</dd>
-  </dl>
+  {% endif %}
+
+  <section class="job-detail-section">
+    <h4>Identity &amp; run</h4>
+    <dl class="job-detail-dl">
+      <dt>Status</dt><dd class="{{ job_status_css(job.status) }}">{{ job.status.value }} ({{ job.status_raw }})</dd>
+      <dt>job_uid</dt><dd><code>{{ job.job_uid }}</code></dd>
+      <dt>Logical ID</dt><dd><code>{{ job.logical_id or '—' }}</code></dd>
+      <dt>scheduler_native_id</dt><dd><code>{{ job.scheduler_native_id or '—' }}</code></dd>
+      <dt>parent_uid</dt><dd><code>{{ job.parent_uid or '—' }}</code></dd>
+      <dt>Type (JIL job_type)</dt><dd>{{ job.autosys.jil.job_type or job.job_type or '—' }}</dd>
+      <dt>Path</dt><dd><code>/{{ job.path_labels|join('/') }}</code></dd>
+      <dt>Scheduled start</dt><dd>{% if job.scheduled_start %}{{ job.scheduled_start.strftime('%Y-%m-%d %H:%M:%S') }}{% else %}—{% endif %}</dd>
+      <dt>Start</dt><dd>{% if job.actual_start %}{{ job.actual_start.strftime('%Y-%m-%d %H:%M:%S') }}{% else %}—{% endif %}</dd>
+      <dt>End</dt><dd>{% if job.actual_end %}{{ job.actual_end.strftime('%Y-%m-%d %H:%M:%S') }}{% else %}—{% endif %}</dd>
+      <dt>Duration (s)</dt><dd>{{ job.duration_sec if job.duration_sec is not none else '—' }}</dd>
+      <dt>Exit code</dt><dd>{{ job.exit_code if job.exit_code is not none else '—' }}</dd>
+    </dl>
+  </section>
+
+  <section class="job-detail-section">
+    <h4>JIL definition</h4>
+    <dl class="job-detail-dl">
+      {% for key, value in job.autosys.jil.model_dump().items() %}
+      <dt>{{ key }}</dt>
+      <dd>{% if value is none or value == '' %}—{% elif key in ['command', 'watch_file', 'condition', 'std_out_file', 'std_err_file', 'start_times'] %}<code>{{ value }}</code>{% else %}{{ value }}{% endif %}</dd>
+      {% endfor %}
+    </dl>
+  </section>
+
+  <section class="job-detail-section">
+    <h4>Run instance</h4>
+    <dl class="job-detail-dl">
+      {% for key, value in job.autosys.run.model_dump().items() %}
+      <dt>{{ key }}</dt>
+      <dd>
+        {% if key == 'global_variables' and value %}
+        <pre class="config-preview">{{ value }}</pre>
+        {% elif key in ['actual_start', 'actual_end'] and value %}
+        {{ value.strftime('%Y-%m-%d %H:%M:%S') if value.strftime is defined else value }}
+        {% elif key in ['resolved_command', 'resolved_watch_file'] and value %}
+        <code>{{ value }}</code>
+        {% elif value is not none and value != '' and value != {} %}
+        {{ value }}
+        {% else %}—{% endif %}
+      </dd>
+      {% endfor %}
+    </dl>
+  </section>
+
+  {% if job.attributes %}
+  <section class="job-detail-section">
+    <h4>Adapter attributes</h4>
+    <dl class="job-detail-dl">
+      {% for key, value in job.attributes.items() %}
+      <dt>{{ key }}</dt><dd><code>{{ value }}</code></dd>
+      {% endfor %}
+    </dl>
+  </section>
+  {% endif %}
 </article>

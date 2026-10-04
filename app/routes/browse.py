@@ -7,6 +7,11 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from app.adapters.factory import get_adapter
+from app.browse_status_filters import (
+    BROWSE_STATUS_FILTER_ORDER,
+    BROWSE_STATUS_INACTIVE_VALUES,
+    BROWSE_STATUS_LABELS,
+)
 from app.config import load_environments
 from app.models import AsOf, AsOfKind, ComparisonContext, ContextFilters, SchedulerType
 from app.search.sqlite_fts import search_index
@@ -18,6 +23,9 @@ router = APIRouter()
 templates = Jinja2Templates(directory="app/templates")
 templates.env.globals["job_status_css"] = job_status_css
 templates.env.globals["tree_child_count"] = child_count
+templates.env.globals["browse_status_labels"] = BROWSE_STATUS_LABELS
+templates.env.globals["browse_status_inactive_values"] = BROWSE_STATUS_INACTIVE_VALUES
+templates.env.globals["browse_status_filter_order"] = BROWSE_STATUS_FILTER_ORDER
 
 
 def _env_options():
@@ -143,12 +151,12 @@ async def browse_job_detail(request: Request, uid: str, session_id: str):
     return templates.TemplateResponse(
         request,
         "partials/job_detail.html",
-        {"job": job, "side": "browse"},
+        {"job": job, "side": "browse", "panel_mode": "browse"},
     )
 
 
 @router.get("/api/browse/tree", response_class=HTMLResponse)
-async def browse_tree(request: Request, session_id: str, parent_uid: str = ""):
+async def browse_tree(request: Request, session_id: str, parent_uid: str = "", depth: int = 0):
     session = session_store.get_browse(session_id)
     if not session:
         return HTMLResponse("<p>Session expired. Load the environment again.</p>", status_code=404)
@@ -159,14 +167,13 @@ async def browse_tree(request: Request, session_id: str, parent_uid: str = ""):
         nodes = get_child_nodes(snap, parent_uid)
     return templates.TemplateResponse(
         request,
-        "partials/tree_nodes.html",
+        "partials/tree_browse_nodes.html",
         {
             "nodes": nodes,
-            "side": "browse",
             "session_id": session_id,
             "snapshot": snap,
-            "mismatch_ids": set(),
             "tree_api_base": "/api/browse/tree",
             "job_api_base": "/api/browse/job",
+            "depth": depth,
         },
     )

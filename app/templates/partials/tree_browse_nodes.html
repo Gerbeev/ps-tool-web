@@ -1,0 +1,2 @@
+{% from 'macros/tree_browse.html' import render_browse_nodes %}
+{{ render_browse_nodes(nodes, session_id, snapshot, tree_api_base, job_api_base, depth|default(0)) }}

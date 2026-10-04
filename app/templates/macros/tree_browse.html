@@ -1,0 +1,62 @@
+{% macro render_browse_node(node, session_id, snapshot, tree_api_base, job_api_base, depth=0) %}
+{% set job = node.job %}
+{% set n_children = tree_child_count(snapshot, job.job_uid) %}
+{% set branch_open = depth < 2 %}
+<div class="browse-tree-node" style="--browse-depth: {{ depth }}">
+  <div class="browse-row-grid browse-job-row"
+       role="button"
+       tabindex="0"
+       data-job-name="{{ job.scheduler_job_name }}"
+       data-status="{{ job.status.value }}"
+       hx-get="{{ job_api_base }}/{{ job.job_uid }}?session_id={{ session_id }}"
+       hx-target="#job-detail-panel"
+       hx-swap="innerHTML"
+       hx-on::after-request="window.psBrowseOpenPanel && window.psBrowseOpenPanel(this)"
+       onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.click(); }">
+    {% if n_children %}
+    <button type="button"
+            class="browse-tree-expand-btn"
+            aria-expanded="{{ 'true' if branch_open else 'false' }}"
+            aria-label="Expand {{ job.scheduler_job_name }}"
+            onclick="event.stopPropagation(); var branch = this.closest('.browse-tree-node').querySelector(':scope > details.browse-tree-branch'); if (!branch) return; branch.open = !branch.open; this.setAttribute('aria-expanded', branch.open);">
+      <span class="browse-tree-chevron" aria-hidden="true"></span>
+    </button>
+    {% else %}
+    <span class="browse-tree-expand-spacer" aria-hidden="true"></span>
+    {% endif %}
+      <span class="browse-col browse-col-name">
+        <span class="status-dot {{ job_status_css(job.status) }}"></span>
+        <span class="browse-job-name">{{ job.scheduler_job_name }}</span>
+        {% if n_children %}
+        <span class="badge muted">+{{ n_children }}</span>
+        {% endif %}
+      </span>
+      <span class="browse-col browse-col-status">
+        <span class="browse-status-badge {{ job_status_css(job.status) }}">{{ job.status.value }}</span>
+      </span>
+      <span class="browse-col browse-col-start browse-datetime">
+        {% if job.actual_start %}{{ job.actual_start.strftime('%Y-%m-%d %H:%M:%S') }}{% else %}—{% endif %}
+      </span>
+      <span class="browse-col browse-col-end browse-datetime">
+        {% if job.actual_end %}{{ job.actual_end.strftime('%Y-%m-%d %H:%M:%S') }}{% else %}—{% endif %}
+      </span>
+  </div>
+  {% if n_children %}
+  <details class="browse-tree-branch"{% if branch_open %} open{% endif %}>
+    <summary class="browse-tree-branch-summary" aria-hidden="true"></summary>
+    <div class="tree-children browse-tree-children"
+         hx-get="{{ tree_api_base }}?session_id={{ session_id }}&parent_uid={{ job.job_uid }}&depth={{ depth + 1 }}"
+         hx-trigger="revealed once"
+         hx-target="this"
+         hx-swap="innerHTML">
+    </div>
+  </details>
+  {% endif %}
+</div>
+{% endmacro %}
+
+{% macro render_browse_nodes(nodes, session_id, snapshot, tree_api_base, job_api_base, depth=0) %}
+{% for node in nodes %}
+{{ render_browse_node(node, session_id, snapshot, tree_api_base, job_api_base, depth) }}
+{% endfor %}
+{% endmacro %}
