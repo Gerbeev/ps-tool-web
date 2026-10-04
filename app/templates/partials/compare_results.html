@@ -15,7 +15,7 @@
     <summary>Trees</summary>
     <div class="compare-trees-loader"
          hx-get="/api/compare/trees?session_id={{ session_id }}"
-         hx-trigger="toggle from:closest details[target.open], once"
+         hx-trigger="revealed once"
          hx-target="this"
          hx-swap="innerHTML">
       <p class="muted small">Open to load topology trees…</p>

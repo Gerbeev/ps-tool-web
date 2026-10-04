@@ -59,6 +59,8 @@ def test_compare_table_endpoint_all_by_default():
     html = resp.text
     assert "compare-table-panel" in html
     assert 'limit=0' in html or "filter=all" in html
+    assert "details[target.open]" not in html
+    assert 'hx-trigger="revealed once"' in html
     # Trees should not be fully inlined anymore
     assert "RISK_DAILY_ETL" not in html or "Loading table" in html
 
