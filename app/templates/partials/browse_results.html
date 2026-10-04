@@ -1,11 +1,15 @@
 <p class="browse-meta"><strong>{{ meta_line }}</strong> · {{ snapshot.flat_jobs|length }} jobs</p>
 <input type="hidden" id="session-id" name="session_id" value="{{ session_id }}">
-<div class="browse-tree-wrap">
-  {% with snapshot=snapshot, side='browse', session_id=session_id, job_api_base='/api/browse/job', tree_api_base='/api/browse/tree' %}
-  {% include "partials/tree_side.html" %}
-  {% endwith %}
+<div id="browse-workspace" class="browse-workspace">
+  <div class="browse-tree-column">
+    <div class="browse-tree-wrap">
+      {% with snapshot=snapshot, side='browse', session_id=session_id, job_api_base='/api/browse/job', tree_api_base='/api/browse/tree', tree_layout='browse' %}
+      {% include "partials/tree_side.html" %}
+      {% endwith %}
+    </div>
+  </div>
+  <aside id="job-detail-panel" class="browse-detail-panel" aria-live="polite"></aside>
 </div>
-<section id="job-detail-panel" class="job-detail-panel"></section>
 <script>
   (function () {
     var search = document.getElementById('global-search');

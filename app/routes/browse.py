@@ -143,7 +143,7 @@ async def browse_job_detail(request: Request, uid: str, session_id: str):
     return templates.TemplateResponse(
         request,
         "partials/job_detail.html",
-        {"job": job, "side": "browse"},
+        {"job": job, "side": "browse", "panel_mode": "browse"},
     )
 
 
@@ -159,13 +159,11 @@ async def browse_tree(request: Request, session_id: str, parent_uid: str = ""):
         nodes = get_child_nodes(snap, parent_uid)
     return templates.TemplateResponse(
         request,
-        "partials/tree_nodes.html",
+        "partials/tree_browse_nodes.html",
         {
             "nodes": nodes,
-            "side": "browse",
             "session_id": session_id,
             "snapshot": snap,
-            "mismatch_ids": set(),
             "tree_api_base": "/api/browse/tree",
             "job_api_base": "/api/browse/job",
         },
