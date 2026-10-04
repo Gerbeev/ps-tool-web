@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 
 from app.config import get_settings
 from app.adapters.example_jobs import (
-    definition_from_example,
+    autosys_reference_from_example,
     load_autosys_example_jobs,
     load_ps_example_jobs,
 )
@@ -16,7 +16,7 @@ from app.models import (
     DependencyKind,
     JobNode,
     JobStatus,
-    NormalizedJob,
+    SnapshotJob,
     TopologySnapshot,
 )
 
@@ -40,39 +40,46 @@ def _job(
     machine: str = "batch01",
     log_suffix: str = ".log",
     examples: dict | None = None,
-) -> NormalizedJob:
+    scheduler: str = "autosys",
+) -> SnapshotJob:
     uid = _uid(side, *path_labels)
     duration = None
     if start and end:
         duration = (end - start).total_seconds()
-    definition = definition_from_example(examples or {}, name, path_labels)
-    log_paths = definition.get("log_paths") or []
-    if not log_paths:
-        log_paths = [f"/logs/{side}/{name}{log_suffix}"]
-    resolved_job_type = definition.get("job_type") or job_type
-    resolved_machine = definition.get("machine") or machine
-    return NormalizedJob(
+    ref = autosys_reference_from_example(
+        examples or {},
+        name,
+        path_labels,
+        actual_start=start,
+        actual_end=end,
+        status_raw=status_raw,
+        exit_code=exit_code,
+        scheduler=scheduler,
+    )
+    if not ref.jil.job_name:
+        ref.jil.job_name = name
+    if not ref.jil.job_type:
+        ref.jil.job_type = job_type.upper() if job_type != "box" else "BOX"
+    if not ref.jil.machine and machine:
+        ref.jil.machine = machine
+    if not ref.jil.std_out_file:
+        ref.jil.std_out_file = f"/logs/{side}/{name}{log_suffix}"
+    if not ref.run.status:
+        ref.run.status = status_raw
+    native_type = job_type if not examples else None
+    return SnapshotJob(
         job_uid=uid,
         scheduler_job_name=name,
         parent_uid=parent_uid,
-        job_type=resolved_job_type,
         status=status,
         status_raw=status_raw,
         actual_start=start,
         actual_end=end,
         duration_sec=duration,
         exit_code=exit_code,
-        machine=resolved_machine,
-        box_name=definition.get("box_name"),
-        schedule=definition.get("schedule"),
-        command=definition.get("command"),
-        condition=definition.get("condition"),
-        log_paths=log_paths,
-        resolved_command=definition.get("resolved_command"),
-        resolved_parameters=definition.get("resolved_parameters") or {},
-        log_path=log_paths[0] if log_paths else None,
+        autosys=ref,
         path_labels=list(path_labels),
-        attributes=dict(definition.get("jil_attributes") or {}),
+        attributes={"native_job_type": native_type} if native_type else {},
     )
 
 
@@ -110,7 +117,7 @@ def apply_root_scope(snap: TopologySnapshot, root_name: str | None) -> TopologyS
     if not subtree:
         return snap
 
-    flat: list[NormalizedJob] = []
+    flat: list[SnapshotJob] = []
     edges: list[DependencyEdge] = []
 
     def flatten(node: JobNode) -> None:
@@ -146,7 +153,7 @@ def build_large_autosys_snapshot(context: ComparisonContext, job_count: int) -> 
         end=base + timedelta(hours=2),
     )
     children: list[JobNode] = []
-    flat: list[NormalizedJob] = [box]
+    flat: list[SnapshotJob] = [box]
     edges: list[DependencyEdge] = []
     for i in range(n - 1):
         status = JobStatus.FAILURE if i % 500 == 17 else JobStatus.SUCCESS
@@ -189,7 +196,7 @@ def build_large_ps_snapshot(context: ComparisonContext, job_count: int) -> Topol
         end=base + timedelta(hours=2),
     )
     children: list[JobNode] = []
-    flat: list[NormalizedJob] = [topo]
+    flat: list[SnapshotJob] = [topo]
     edges: list[DependencyEdge] = []
     for i in range(n - 1):
         # Deliberate status drift on a subset vs AutoSys mock.
@@ -244,6 +251,7 @@ def build_autosys_snapshot(context: ComparisonContext) -> TopologySnapshot:
         start=base,
         end=base + timedelta(hours=2),
         examples=examples,
+        scheduler="autosys",
     )
     etl = _job(
         side,
@@ -257,6 +265,7 @@ def build_autosys_snapshot(context: ComparisonContext) -> TopologySnapshot:
         end=base + timedelta(minutes=45),
         exit_code=0,
         examples=examples,
+        scheduler="autosys",
     )
     recon = _job(
         side,
@@ -270,6 +279,7 @@ def build_autosys_snapshot(context: ComparisonContext) -> TopologySnapshot:
         end=base + timedelta(minutes=55),
         exit_code=8 if recon_failed else 0,
         examples=examples,
+        scheduler="autosys",
     )
     file_wait = _job(
         side,
@@ -282,6 +292,7 @@ def build_autosys_snapshot(context: ComparisonContext) -> TopologySnapshot:
         start=base + timedelta(minutes=1),
         end=base + timedelta(minutes=4),
         examples=examples,
+        scheduler="autosys",
     )
     dotnet = _job(
         side,
@@ -294,6 +305,7 @@ def build_autosys_snapshot(context: ComparisonContext) -> TopologySnapshot:
         start=base + timedelta(minutes=46),
         end=base + timedelta(minutes=49),
         examples=examples,
+        scheduler="autosys",
     )
     legacy_only = _job(
         side,
@@ -306,6 +318,7 @@ def build_autosys_snapshot(context: ComparisonContext) -> TopologySnapshot:
         start=base + timedelta(minutes=56),
         end=base + timedelta(minutes=58),
         examples=examples,
+        scheduler="autosys",
     )
 
     roots = [
@@ -416,6 +429,7 @@ def build_ps_daily_snapshot(context: ComparisonContext) -> TopologySnapshot:
         start=base,
         end=base + timedelta(hours=2, minutes=3),
         examples=examples,
+        scheduler="process_scheduler",
     )
     etl = _job(
         side,
@@ -429,6 +443,7 @@ def build_ps_daily_snapshot(context: ComparisonContext) -> TopologySnapshot:
         end=base + timedelta(minutes=44),
         exit_code=0,
         examples=examples,
+        scheduler="process_scheduler",
     )
     recon = _job(
         side,
@@ -442,6 +457,7 @@ def build_ps_daily_snapshot(context: ComparisonContext) -> TopologySnapshot:
         end=base + timedelta(minutes=57),
         exit_code=0,
         examples=examples,
+        scheduler="process_scheduler",
     )
     file_wait = _job(
         side,
@@ -454,6 +470,7 @@ def build_ps_daily_snapshot(context: ComparisonContext) -> TopologySnapshot:
         start=base + timedelta(minutes=1),
         end=base + timedelta(minutes=4),
         examples=examples,
+        scheduler="process_scheduler",
     )
     dotnet = _job(
         side,
@@ -466,6 +483,7 @@ def build_ps_daily_snapshot(context: ComparisonContext) -> TopologySnapshot:
         start=base + timedelta(minutes=46, seconds=30),
         end=base + timedelta(minutes=50),
         examples=examples,
+        scheduler="process_scheduler",
     )
     extra = _job(
         side,
@@ -476,6 +494,7 @@ def build_ps_daily_snapshot(context: ComparisonContext) -> TopologySnapshot:
         "Pending",
         parent_uid=topo.job_uid,
         examples=examples,
+        scheduler="process_scheduler",
     )
     orphan = _job(
         side,
@@ -485,6 +504,7 @@ def build_ps_daily_snapshot(context: ComparisonContext) -> TopologySnapshot:
         JobStatus.NOT_RUN,
         "NotRun",
         examples=examples,
+        scheduler="process_scheduler",
     )
 
     roots = [

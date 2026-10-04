@@ -1,84 +1,74 @@
-"""Tests for extended job definition and run-field comparison."""
+"""Tests for AutoSys-reference job comparison."""
 
-from app.adapters.example_jobs import (
-    load_autosys_example_jobs,
-    load_ps_example_jobs,
-    schedule_from_jil,
-    schedule_from_row,
-)
-from app.models import ComparedField, JobSchedule, JobStatus, NormalizedJob
-from app.services.comparison import _compare_job_fields, compare_contexts
+from app.adapters.example_jobs import load_autosys_example_jobs, load_ps_example_jobs
+from app.autosys_reference import AutoSysJobDefinition, AutoSysJobReference, AutoSysRunInstance
+from app.models import JobStatus, SnapshotJob
+from app.services.comparison import compare_contexts, compare_job_parameters
 from tests.test_comparison import _default_left_context, _default_right_context
 
 
-def test_example_yaml_loads_schedule_and_resolved_command():
+def test_example_yaml_loads_jil_and_autosys_reference():
     autosys = load_autosys_example_jobs()
     etl = autosys["RISK_DAILY_ETL"]
-    sched = schedule_from_row(etl)
-    assert sched is not None
-    assert sched.expression == "5 6 * * *"
+    assert etl["jil"]["start_times"] == "06:05"
     assert etl["run_instance"]["resolved_command"].endswith("2026-10-02")
-    legacy = autosys["RISK_LEGACY_REPORT"]["jil"]
-    legacy_sched = schedule_from_jil(legacy)
-    assert legacy_sched is not None
-    assert legacy_sched.expression == "56 6 * * 1-5"
 
     ps = load_ps_example_jobs()
     ps_etl = ps["RiskDaily.EtlJob"]
-    assert ps_etl["schedule"]["expression"] == "5 6 * * *"
+    assert ps_etl["autosys_reference"]["jil"]["start_times"] == "06:05"
 
 
-def test_compare_reports_schedule_and_command_mismatches():
-    left = NormalizedJob(
+def test_compare_reports_parameter_mismatches():
+    left = SnapshotJob(
         job_uid="l1",
         scheduler_job_name="A",
-        job_type="cmd",
         status=JobStatus.SUCCESS,
-        schedule=JobSchedule(expression="0 6 * * *", calendar="every_day"),
-        command="cmd_a",
-        log_paths=["/logs/a.log"],
+        autosys=AutoSysJobReference(
+            jil=AutoSysJobDefinition(start_times="06:00", command="cmd_a", std_out_file="/logs/a.out"),
+            run=AutoSysRunInstance(resolved_command="cmd_a"),
+        ),
     )
-    right = NormalizedJob(
+    right = SnapshotJob(
         job_uid="r1",
         scheduler_job_name="B",
-        job_type="cmd",
         status=JobStatus.SUCCESS,
-        schedule=JobSchedule(expression="5 6 * * *", calendar="every_day"),
-        command="cmd_b",
-        log_paths=["/logs/b.log"],
+        autosys=AutoSysJobReference(
+            jil=AutoSysJobDefinition(start_times="06:05", command="cmd_b", std_out_file="/logs/b.out"),
+            run=AutoSysRunInstance(resolved_command="cmd_b"),
+        ),
     )
-    mismatches = _compare_job_fields(left, right, "logical-a", 60.0)
-    fields = {m.field for m in mismatches}
-    assert ComparedField.SCHEDULE in fields
-    assert ComparedField.COMMAND in fields
-    assert ComparedField.LOG_PATHS in fields
+    mismatches = compare_job_parameters(left, right, "logical-a")
+    params = {m.parameter for m in mismatches}
+    assert "start_times" in params
+    assert "command" in params
+    assert "std_out_file" in params
 
 
-def test_compare_mock_context_schedule_parity_for_etl():
+def test_compare_mock_context_start_times_parity_for_etl():
     result = compare_contexts(_default_left_context(), _default_right_context())
-    etl_schedule = [
+    etl = [
         m
-        for m in result.field_mismatches
-        if m.logical_id == "RISK_DAILY_ETL|RiskDaily.EtlJob" and m.field == ComparedField.SCHEDULE
+        for m in result.parameter_mismatches
+        if m.logical_id == "RISK_DAILY_ETL|RiskDaily.EtlJob" and m.parameter == "start_times"
     ]
-    assert etl_schedule == []
+    assert etl == []
 
 
 def test_compare_mock_context_resolved_command_parity_for_etl():
     result = compare_contexts(_default_left_context(), _default_right_context())
-    etl_resolved = [
+    etl = [
         m
-        for m in result.field_mismatches
-        if m.logical_id == "RISK_DAILY_ETL|RiskDaily.EtlJob" and m.field == ComparedField.RESOLVED_COMMAND
+        for m in result.parameter_mismatches
+        if m.logical_id == "RISK_DAILY_ETL|RiskDaily.EtlJob" and m.parameter == "resolved_command"
     ]
-    assert etl_resolved == []
+    assert etl == []
 
 
-def test_compare_mock_context_command_syntax_diff_for_etl():
+def test_compare_mock_context_command_parameter_diff_for_etl():
     result = compare_contexts(_default_left_context(), _default_right_context())
     etl_cmd = [
         m
-        for m in result.field_mismatches
-        if m.logical_id == "RISK_DAILY_ETL|RiskDaily.EtlJob" and m.field == ComparedField.COMMAND
+        for m in result.parameter_mismatches
+        if m.logical_id == "RISK_DAILY_ETL|RiskDaily.EtlJob" and m.parameter == "command"
     ]
     assert len(etl_cmd) == 1

@@ -38,6 +38,15 @@ def _env_options():
     return load_environments()
 
 
+def _parameter_mismatches_by_logical_id(result) -> dict[str, list]:
+    out: dict[str, list] = {}
+    for m in result.parameter_mismatches:
+        if not m.logical_id:
+            continue
+        out.setdefault(m.logical_id, []).append(m)
+    return out
+
+
 def _mismatch_logical_ids(result) -> set[str]:
     ids: set[str] = set()
     for pair in result.status_mismatches:
@@ -49,6 +58,9 @@ def _mismatch_logical_ids(result) -> set[str]:
     for job in result.right_only:
         lid = job.logical_id or job.scheduler_job_name
         ids.add(lid)
+    for m in result.parameter_mismatches:
+        if m.logical_id:
+            ids.add(m.logical_id)
     return ids
 
 
@@ -142,6 +154,7 @@ async def compare_table(
             "total": total,
             "q_prefix": q_prefix,
             "default_limit": settings.table_page_size_default,
+            "param_mismatches_by_id": _parameter_mismatches_by_logical_id(session.result),
         },
     )
 

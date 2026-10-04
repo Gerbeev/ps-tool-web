@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 
-from app.models import ComparisonContext, NormalizedJob, SchedulerType, TopologySnapshot
+from app.models import ComparisonContext, SchedulerType, SnapshotJob, TopologySnapshot
 
 
 class SchedulerAdapter(ABC):
@@ -21,7 +21,7 @@ class SchedulerAdapter(ABC):
     @abstractmethod
     def fetch_job_detail(
         self, context: ComparisonContext, job_uid: str
-    ) -> NormalizedJob | None:
+    ) -> SnapshotJob | None:
         """Optional lazy load of extended job fields."""
 
     def list_roots(self, context: ComparisonContext) -> list[str]:

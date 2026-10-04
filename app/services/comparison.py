@@ -2,25 +2,20 @@
 
 from __future__ import annotations
 
-from datetime import datetime
-
 from app.adapters.factory import get_adapter
+from app.autosys_reference import compare_references, load_compare_parameters
 from app.models import (
-    ComparedField,
     ComparisonContext,
     ComparisonResult,
     ComparisonSummary,
-    FieldMismatch,
     JobPair,
     MatchConfidence,
-    NormalizedJob,
+    ParameterMismatch,
+    SnapshotJob,
 )
 from app.services.identity import annotate_snapshot_jobs, logical_id_for_job
 from app.services.snapshot_cache import SnapshotCache, snapshot_cache
 from app.services.topology_index import ensure_topology_indexes
-
-
-TIMING_DELTA_THRESHOLD_SEC = 60.0
 
 
 def fetch_snapshot(
@@ -48,12 +43,13 @@ def compare_contexts(
     right: ComparisonContext,
     *,
     cache: SnapshotCache | None = None,
-    timing_threshold_sec: float = TIMING_DELTA_THRESHOLD_SEC,
 ) -> ComparisonResult:
+    cfg = load_compare_parameters()
+    timing_threshold_sec = cfg.timing_threshold_sec
     left_snap, _ = fetch_snapshot(left, cache)
     right_snap, _ = fetch_snapshot(right, cache)
 
-    left_by_logical: dict[str, NormalizedJob] = {}
+    left_by_logical: dict[str, SnapshotJob] = {}
     left_confidence: dict[str, MatchConfidence] = {}
     for job in left_snap.flat_jobs:
         lid, conf = logical_id_for_job(job, left.scheduler)
@@ -62,7 +58,7 @@ def compare_contexts(
             left_by_logical[lid] = job
             left_confidence[lid] = conf
 
-    right_by_logical: dict[str, NormalizedJob] = {}
+    right_by_logical: dict[str, SnapshotJob] = {}
     right_confidence: dict[str, MatchConfidence] = {}
     for job in right_snap.flat_jobs:
         lid, conf = logical_id_for_job(job, right.scheduler)
@@ -73,13 +69,14 @@ def compare_contexts(
 
     all_keys = set(left_by_logical) | set(right_by_logical)
     pairs: list[JobPair] = []
-    left_only: list[NormalizedJob] = []
-    right_only: list[NormalizedJob] = []
+    left_only: list[SnapshotJob] = []
+    right_only: list[SnapshotJob] = []
     status_mismatches: list[JobPair] = []
     timing_deltas: list[JobPair] = []
     definition_mismatches: list[JobPair] = []
-    field_mismatches: list[FieldMismatch] = []
-    schedule_mm = command_mm = condition_mm = log_mm = resolved_cmd_mm = timing_mm = 0
+    parameter_mismatches: list[ParameterMismatch] = []
+    param_counts: dict[str, int] = {}
+    timing_mm = 0
 
     for lid in sorted(all_keys):
         lj = left_by_logical.get(lid)
@@ -100,22 +97,13 @@ def compare_contexts(
             delta = _timing_delta_sec(lj, rj)
             if delta is not None and delta > timing_threshold_sec:
                 timing_deltas.append(pair)
-            mismatches = _compare_job_fields(lj, rj, lid, timing_threshold_sec)
+            mismatches = compare_job_parameters(lj, rj, lid, config=cfg)
             if mismatches:
                 definition_mismatches.append(pair)
-                field_mismatches.extend(mismatches)
+                parameter_mismatches.extend(mismatches)
                 for m in mismatches:
-                    if m.field == ComparedField.SCHEDULE:
-                        schedule_mm += 1
-                    elif m.field == ComparedField.COMMAND:
-                        command_mm += 1
-                    elif m.field == ComparedField.CONDITION:
-                        condition_mm += 1
-                    elif m.field == ComparedField.LOG_PATHS:
-                        log_mm += 1
-                    elif m.field == ComparedField.RESOLVED_COMMAND:
-                        resolved_cmd_mm += 1
-                    elif m.field in (ComparedField.START_TIME, ComparedField.END_TIME):
+                    param_counts[m.parameter] = param_counts.get(m.parameter, 0) + 1
+                    if m.parameter in ("actual_start", "actual_end"):
                         timing_mm += 1
         elif lj:
             left_only.append(lj)
@@ -127,11 +115,8 @@ def compare_contexts(
         total_right=len(right_snap.flat_jobs),
         matched=len(pairs),
         mismatched_status=len(status_mismatches),
-        mismatched_schedule=schedule_mm,
-        mismatched_command=command_mm,
-        mismatched_condition=condition_mm,
-        mismatched_log_paths=log_mm,
-        mismatched_resolved_command=resolved_cmd_mm,
+        mismatched_parameters=len(parameter_mismatches),
+        parameter_mismatch_counts=param_counts,
         mismatched_timing=timing_mm,
         left_only_count=len(left_only),
         right_only_count=len(right_only),
@@ -146,92 +131,28 @@ def compare_contexts(
         status_mismatches=status_mismatches,
         timing_deltas=timing_deltas,
         definition_mismatches=definition_mismatches,
-        field_mismatches=field_mismatches,
+        parameter_mismatches=parameter_mismatches,
         summary=summary,
     )
 
 
-def _compare_job_fields(
-    left: NormalizedJob,
-    right: NormalizedJob,
+def compare_job_parameters(
+    left: SnapshotJob,
+    right: SnapshotJob,
     logical_id: str | None,
-    timing_threshold_sec: float,
-) -> list[FieldMismatch]:
-    out: list[FieldMismatch] = []
-
-    def record(field: ComparedField, lv: str, rv: str, *, time_field: bool = False) -> None:
-        if time_field:
-            if _times_within_threshold(lv, rv, timing_threshold_sec):
-                return
-        elif lv == rv:
-            return
-        out.append(
-            FieldMismatch(logical_id=logical_id, field=field, left_value=lv, right_value=rv)
+    *,
+    config=None,
+) -> list[ParameterMismatch]:
+    raw = compare_references(left.autosys, right.autosys, logical_id=logical_id, config=config)
+    return [
+        ParameterMismatch(
+            logical_id=logical_id,
+            parameter=param,
+            left_value=lv,
+            right_value=rv,
         )
-
-    record(ComparedField.SCHEDULE, _schedule_repr(left), _schedule_repr(right))
-    record(ComparedField.COMMAND, _norm_text(left.command), _norm_text(right.command))
-    record(ComparedField.CONDITION, _norm_text(left.condition), _norm_text(right.condition))
-    record(
-        ComparedField.LOG_PATHS,
-        _log_paths_repr(left.log_paths),
-        _log_paths_repr(right.log_paths),
-    )
-    record(
-        ComparedField.RESOLVED_COMMAND,
-        _norm_text(left.resolved_command),
-        _norm_text(right.resolved_command),
-    )
-    record(
-        ComparedField.START_TIME,
-        _time_repr(left.actual_start),
-        _time_repr(right.actual_start),
-        time_field=True,
-    )
-    record(
-        ComparedField.END_TIME,
-        _time_repr(left.actual_end),
-        _time_repr(right.actual_end),
-        time_field=True,
-    )
-    return out
-
-
-def _norm_text(value: str | None) -> str:
-    return (value or "").strip()
-
-
-def _schedule_repr(job: NormalizedJob) -> str:
-    if job.schedule:
-        return job.schedule.comparable()
-    return ""
-
-
-def _log_paths_repr(paths: list[str]) -> str:
-    return ";".join(sorted(p.strip() for p in paths if p.strip()))
-
-
-def _time_repr(dt: datetime | None) -> str:
-    if dt is None:
-        return ""
-    return dt.isoformat()
-
-
-def _times_within_threshold(left: str, right: str, threshold_sec: float) -> bool:
-    if not left and not right:
-        return True
-    if not left or not right:
-        return False
-    try:
-        ld = datetime.fromisoformat(left.replace("Z", "+00:00"))
-        rd = datetime.fromisoformat(right.replace("Z", "+00:00"))
-    except ValueError:
-        return left == right
-    if ld.tzinfo is None and rd.tzinfo is not None:
-        ld = ld.replace(tzinfo=rd.tzinfo)
-    if rd.tzinfo is None and ld.tzinfo is not None:
-        rd = rd.replace(tzinfo=ld.tzinfo)
-    return abs((ld - rd).total_seconds()) <= threshold_sec
+        for param, lv, rv in raw
+    ]
 
 
 def _best_confidence(a: MatchConfidence | None, b: MatchConfidence | None) -> MatchConfidence:
@@ -247,7 +168,7 @@ def _best_confidence(a: MatchConfidence | None, b: MatchConfidence | None) -> Ma
     return ca if scores[ca] <= scores[cb] else cb
 
 
-def _timing_delta_sec(left: NormalizedJob, right: NormalizedJob) -> float | None:
+def _timing_delta_sec(left: SnapshotJob, right: SnapshotJob) -> float | None:
     if left.actual_end and right.actual_end:
         return abs((left.actual_end - right.actual_end).total_seconds())
     if left.actual_start and right.actual_start:

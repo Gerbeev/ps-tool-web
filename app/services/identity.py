@@ -6,7 +6,7 @@ import re
 from functools import lru_cache
 
 from app.config import load_identity_map
-from app.models import MatchConfidence, NormalizedJob, SchedulerType
+from app.models import MatchConfidence, SchedulerType, SnapshotJob
 
 
 @lru_cache
@@ -20,7 +20,7 @@ def _pair_map() -> dict[tuple[str, str], str]:
     return mapping
 
 
-def logical_id_for_job(job: NormalizedJob, scheduler: SchedulerType) -> tuple[str | None, MatchConfidence]:
+def logical_id_for_job(job: SnapshotJob, scheduler: SchedulerType) -> tuple[str | None, MatchConfidence]:
     name = job.scheduler_job_name
     sched_key = scheduler.value
     pairs = _pair_map()
@@ -56,7 +56,7 @@ def _normalize_name(name: str) -> str:
     return result
 
 
-def annotate_snapshot_jobs(jobs: list[NormalizedJob], scheduler: SchedulerType) -> None:
+def annotate_snapshot_jobs(jobs: list[SnapshotJob], scheduler: SchedulerType) -> None:
     for job in jobs:
         lid, _conf = logical_id_for_job(job, scheduler)
         job.logical_id = lid

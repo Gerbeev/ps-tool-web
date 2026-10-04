@@ -71,6 +71,8 @@ class SQLiteFTSSearchIndex(SearchIndex):
         cur.execute("DELETE FROM jobs_fts WHERE side = ? AND snapshot_id = ?", (side, snapshot.snapshot_id))
         for job in snapshot.flat_jobs:
             path = "/".join(job.path_labels)
+            jil = job.autosys.jil
+            run = job.autosys.run
             body = " ".join(
                 filter(
                     None,
@@ -80,6 +82,13 @@ class SQLiteFTSSearchIndex(SearchIndex):
                         path,
                         job.status.value,
                         job.job_type,
+                        jil.job_name or "",
+                        jil.command or "",
+                        jil.condition or "",
+                        jil.watch_file or "",
+                        jil.start_times or "",
+                        jil.std_out_file or "",
+                        run.resolved_command or "",
                         job.log_path or "",
                     ],
                 )

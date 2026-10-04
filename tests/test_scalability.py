@@ -12,7 +12,7 @@ from app.models import (
     ComparisonContext,
     JobNode,
     JobStatus,
-    NormalizedJob,
+    SnapshotJob,
     SchedulerType,
     TopologySnapshot,
 )
@@ -110,10 +110,9 @@ def test_large_compare_under_one_second(monkeypatch):
             as_of=AsOf(kind=AsOfKind.BUSINESS_DATE, value="2026-10-02"),
         )
         jobs = [
-            NormalizedJob(
+            SnapshotJob(
                 job_uid=f"j{i}",
                 scheduler_job_name=f"RISK_JOB_{i:04d}",
-                job_type="cmd",
                 status=JobStatus.SUCCESS,
                 status_raw="OK",
                 path_labels=["RISK_DAILY_BOX", f"RISK_JOB_{i:04d}"],

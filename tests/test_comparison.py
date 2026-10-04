@@ -42,8 +42,8 @@ def test_compare_finds_status_mismatch_and_orphans():
     assert recon_pair.right.status == JobStatus.SUCCESS
 
 
-def test_compare_populates_definition_field_mismatches():
+def test_compare_populates_parameter_mismatches():
     result = compare_contexts(_default_left_context(), _default_right_context())
-    assert result.summary.mismatched_schedule >= 0
-    assert len(result.field_mismatches) >= 1
+    assert result.summary.mismatched_parameters >= 1
+    assert len(result.parameter_mismatches) >= 1
     assert len(result.definition_mismatches) >= 1

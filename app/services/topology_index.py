@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.models import JobNode, NormalizedJob, TopologySnapshot
+from app.models import JobNode, SnapshotJob, TopologySnapshot
 
 
 def build_children_index(roots: list[JobNode]) -> dict[str, list[str]]:
@@ -38,7 +38,7 @@ def get_child_nodes(snapshot: TopologySnapshot, parent_uid: str) -> list[JobNode
     """Return shallow JobNode list (no nested children) for lazy tree expansion."""
     ensure_topology_indexes(snapshot)
     index = snapshot.metadata.get("children_index") or {}
-    by_uid: dict[str, NormalizedJob] = snapshot.metadata.get("jobs_by_uid") or {
+    by_uid: dict[str, SnapshotJob] = snapshot.metadata.get("jobs_by_uid") or {
         j.job_uid: j for j in snapshot.flat_jobs
     }
     child_uids = index.get(parent_uid, [])

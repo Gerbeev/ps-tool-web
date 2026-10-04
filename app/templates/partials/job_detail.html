@@ -3,18 +3,26 @@
   <dl>
     <dt>Status</dt><dd class="{{ job_status_css(job.status) }}">{{ job.status.value }} ({{ job.status_raw }})</dd>
     <dt>Logical ID</dt><dd><code>{{ job.logical_id or '—' }}</code></dd>
-    <dt>Type</dt><dd>{{ job.job_type }}</dd>
+    <dt>Type (JIL job_type)</dt><dd>{{ job.autosys.jil.job_type or job.job_type or '—' }}</dd>
     <dt>Path</dt><dd><code>/{{ job.path_labels|join('/') }}</code></dd>
     <dt>Start</dt><dd>{{ job.actual_start or '—' }}</dd>
     <dt>End</dt><dd>{{ job.actual_end or '—' }}</dd>
     <dt>Duration (s)</dt><dd>{{ job.duration_sec or '—' }}</dd>
     <dt>Exit code</dt><dd>{{ job.exit_code if job.exit_code is not none else '—' }}</dd>
-    <dt>Machine</dt><dd>{{ job.machine or '—' }}</dd>
-    <dt>Schedule</dt><dd><code>{{ job.schedule.comparable() if job.schedule else '—' }}</code></dd>
-    <dt>Command</dt><dd><code>{{ job.command or '—' }}</code></dd>
-    <dt>Condition</dt><dd><code>{{ job.condition or '—' }}</code></dd>
-    <dt>Resolved command</dt><dd><code>{{ job.resolved_command or '—' }}</code></dd>
-    <dt>Log paths</dt><dd>{% if job.log_paths %}<ul>{% for p in job.log_paths %}<li><code>{{ p }}</code></li>{% endfor %}</ul>{% else %}—{% endif %}</dd>
-    <dt>Log path</dt><dd><code>{{ job.log_path or '—' }}</code></dd>
+    <dt>machine</dt><dd>{{ job.autosys.jil.machine or '—' }}</dd>
+    <dt>box_name</dt><dd>{{ job.autosys.jil.box_name or '—' }}</dd>
+    <dt>date_conditions</dt><dd>{{ job.autosys.jil.date_conditions or '—' }}</dd>
+    <dt>start_times</dt><dd><code>{{ job.autosys.jil.start_times or '—' }}</code></dd>
+    <dt>start_mins</dt><dd>{{ job.autosys.jil.start_mins or '—' }}</dd>
+    <dt>days_of_week</dt><dd>{{ job.autosys.jil.days_of_week or '—' }}</dd>
+    <dt>run_calendar</dt><dd>{{ job.autosys.jil.run_calendar or '—' }}</dd>
+    <dt>timezone</dt><dd>{{ job.autosys.jil.timezone or '—' }}</dd>
+    <dt>command</dt><dd><code>{{ job.autosys.jil.command or '—' }}</code></dd>
+    <dt>watch_file</dt><dd><code>{{ job.autosys.jil.watch_file or '—' }}</code></dd>
+    <dt>condition</dt><dd><code>{{ job.autosys.jil.condition or '—' }}</code></dd>
+    <dt>std_out_file</dt><dd><code>{{ job.autosys.jil.std_out_file or '—' }}</code></dd>
+    <dt>std_err_file</dt><dd><code>{{ job.autosys.jil.std_err_file or '—' }}</code></dd>
+    <dt>resolved_command (run)</dt><dd><code>{{ job.autosys.run.resolved_command or '—' }}</code></dd>
+    <dt>run status</dt><dd>{{ job.autosys.run.status or '—' }}</dd>
   </dl>
 </article>

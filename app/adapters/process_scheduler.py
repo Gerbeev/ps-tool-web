@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from app.adapters.base import SchedulerAdapter
 from app.adapters.mock_data import build_ps_snapshot, list_ps_topology_names
-from app.models import ComparisonContext, NormalizedJob, SchedulerType, TopologySnapshot
+from app.models import ComparisonContext, SchedulerType, SnapshotJob, TopologySnapshot
 
 
 class ProcessSchedulerMockAdapter(SchedulerAdapter):
@@ -16,7 +16,7 @@ class ProcessSchedulerMockAdapter(SchedulerAdapter):
     def fetch_topology(self, context: ComparisonContext) -> TopologySnapshot:
         return build_ps_snapshot(context)
 
-    def fetch_job_detail(self, context: ComparisonContext, job_uid: str) -> NormalizedJob | None:
+    def fetch_job_detail(self, context: ComparisonContext, job_uid: str) -> SnapshotJob | None:
         snap = self.fetch_topology(context)
         for job in snap.flat_jobs:
             if job.job_uid == job_uid:
