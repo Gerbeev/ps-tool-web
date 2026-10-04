@@ -1,6 +1,7 @@
 {% macro render_browse_node(node, session_id, snapshot, tree_api_base, job_api_base, depth=0) %}
 {% set job = node.job %}
 {% set n_children = tree_child_count(snapshot, job.job_uid) %}
+{% set branch_open = depth < 2 %}
 <div class="browse-tree-node" style="--browse-depth: {{ depth }}">
   <div class="browse-row-grid browse-job-row"
        role="button"
@@ -13,7 +14,7 @@
     {% if n_children %}
     <button type="button"
             class="browse-tree-expand-btn"
-            aria-expanded="false"
+            aria-expanded="{{ 'true' if branch_open else 'false' }}"
             aria-label="Expand {{ job.scheduler_job_name }}"
             onclick="event.stopPropagation(); var branch = this.closest('.browse-tree-node').querySelector(':scope > details.browse-tree-branch'); if (!branch) return; branch.open = !branch.open; this.setAttribute('aria-expanded', branch.open);">
       <span class="browse-tree-chevron" aria-hidden="true"></span>
@@ -39,7 +40,7 @@
       </span>
   </div>
   {% if n_children %}
-  <details class="browse-tree-branch">
+  <details class="browse-tree-branch"{% if branch_open %} open{% endif %}>
     <summary class="browse-tree-branch-summary" aria-hidden="true"></summary>
     <div class="tree-children browse-tree-children"
          hx-get="{{ tree_api_base }}?session_id={{ session_id }}&parent_uid={{ job.job_uid }}&depth={{ depth + 1 }}"
