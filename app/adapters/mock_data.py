@@ -128,12 +128,19 @@ def apply_root_scope(snap: TopologySnapshot, root_name: str | None) -> TopologyS
     flatten(subtree)
     allowed = {j.job_uid for j in flat}
     edges = [e for e in snap.edges if e.from_uid in allowed and e.to_uid in allowed]
+    # Drop lazy-tree indexes from the parent snapshot; they refer to the full topology.
+    meta = {
+        k: v
+        for k, v in snap.metadata.items()
+        if k not in ("children_index", "jobs_by_uid")
+    }
+    meta["scoped_root"] = root_name
     return TopologySnapshot(
         context=snap.context,
         roots=[subtree],
         flat_jobs=flat,
         edges=edges,
-        metadata={**snap.metadata, "scoped_root": root_name},
+        metadata=meta,
     )
 
 

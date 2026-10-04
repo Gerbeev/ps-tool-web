@@ -9,7 +9,7 @@
       <select name="filter">
         <option value="all" {% if filter == 'all' %}selected{% endif %}>All rows</option>
         <option value="mismatches" {% if filter == 'mismatches' %}selected{% endif %}>Diffs only</option>
-        <option value="matched" {% if filter == 'matched' %}selected{% endif %}>Matched (same status)</option>
+        <option value="matched" {% if filter == 'matched' %}selected{% endif %}>Paired (both sides)</option>
         <option value="status_delta" {% if filter == 'status_delta' %}selected{% endif %}>Status Δ</option>
         <option value="left_only" {% if filter == 'left_only' %}selected{% endif %}>Left only</option>
         <option value="right_only" {% if filter == 'right_only' %}selected{% endif %}>Right only</option>
@@ -76,6 +76,7 @@
       <td class="{{ job_status_css(row.job.status) }}">{{ row.job.status.value }}</td>
       <td>—</td>
       <td>—</td>
+      <td>—</td>
       <td>{{ row.job.logical_id and 'mapped' or 'name_only' }}</td>
     </tr>
     {% elif row.kind == 'right_only' and row.job %}
@@ -86,6 +87,7 @@
       <td>—</td>
       <td>{{ row.job.scheduler_job_name }}</td>
       <td class="{{ job_status_css(row.job.status) }}">{{ row.job.status.value }}</td>
+      <td>—</td>
       <td>{{ row.job.logical_id and 'mapped' or 'name_only' }}</td>
     </tr>
     {% endif %}
