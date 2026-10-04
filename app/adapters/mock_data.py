@@ -49,18 +49,21 @@ def _job(
     log_paths = definition.get("log_paths") or []
     if not log_paths:
         log_paths = [f"/logs/{side}/{name}{log_suffix}"]
+    resolved_job_type = definition.get("job_type") or job_type
+    resolved_machine = definition.get("machine") or machine
     return NormalizedJob(
         job_uid=uid,
         scheduler_job_name=name,
         parent_uid=parent_uid,
-        job_type=job_type,
+        job_type=resolved_job_type,
         status=status,
         status_raw=status_raw,
         actual_start=start,
         actual_end=end,
         duration_sec=duration,
         exit_code=exit_code,
-        machine=machine,
+        machine=resolved_machine,
+        box_name=definition.get("box_name"),
         schedule=definition.get("schedule"),
         command=definition.get("command"),
         condition=definition.get("condition"),
@@ -69,6 +72,7 @@ def _job(
         resolved_parameters=definition.get("resolved_parameters") or {},
         log_path=log_paths[0] if log_paths else None,
         path_labels=list(path_labels),
+        attributes=dict(definition.get("jil_attributes") or {}),
     )
 
 

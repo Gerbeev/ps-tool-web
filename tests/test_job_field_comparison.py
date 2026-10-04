@@ -1,6 +1,11 @@
 """Tests for extended job definition and run-field comparison."""
 
-from app.adapters.example_jobs import load_autosys_example_jobs, load_ps_example_jobs, schedule_from_row
+from app.adapters.example_jobs import (
+    load_autosys_example_jobs,
+    load_ps_example_jobs,
+    schedule_from_jil,
+    schedule_from_row,
+)
 from app.models import ComparedField, JobSchedule, JobStatus, NormalizedJob
 from app.services.comparison import _compare_job_fields, compare_contexts
 from tests.test_comparison import _default_left_context, _default_right_context
@@ -12,7 +17,11 @@ def test_example_yaml_loads_schedule_and_resolved_command():
     sched = schedule_from_row(etl)
     assert sched is not None
     assert sched.expression == "5 6 * * *"
-    assert etl["resolved_command"].endswith("2026-10-02")
+    assert etl["run_instance"]["resolved_command"].endswith("2026-10-02")
+    legacy = autosys["RISK_LEGACY_REPORT"]["jil"]
+    legacy_sched = schedule_from_jil(legacy)
+    assert legacy_sched is not None
+    assert legacy_sched.expression == "56 6 * * 1-5"
 
     ps = load_ps_example_jobs()
     ps_etl = ps["RiskDaily.EtlJob"]

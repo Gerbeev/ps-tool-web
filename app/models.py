@@ -117,6 +117,7 @@ class NormalizedJob(BaseModel):
     duration_sec: float | None = None
     exit_code: int | None = None
     machine: str | None = None
+    box_name: str | None = None
     schedule: JobSchedule | None = None
     command: str | None = None
     condition: str | None = None

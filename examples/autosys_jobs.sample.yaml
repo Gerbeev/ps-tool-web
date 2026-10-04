@@ -1,87 +1,168 @@
-# Representative AutoSys job definitions (Risk Analytics daily box).
-# Used by mock adapters and as documentation for field mapping.
+# AutoSys (CA Workload Automation) sample definitions — Risk Analytics daily box.
+# YAML mirrors JIL job attributes per Broadcom AE 24.2 JIL reference (insert_job, job_type,
+# machine, owner, permission, date_conditions, days_of_week, start_times, run_calendar,
+# condition, box_name, std_out_file, std_err_file, watch_file, alarm_if_fail, max_run_alarm,
+# n_retrys, send_notification, group, application). Global vars: $$name / $${name} (Global Variables).
+# Status / resolved command lines reflect autorep-style run instance, not stored in JIL.
 scheduler: autosys
 jobs:
-  - name: RISK_DAILY_BOX
-    path: [RISK_DAILY_BOX]
-    job_type: box
-    schedule:
-      expression: "0 6 * * *"
-      calendar: every_day
+  - path: [RISK_DAILY_BOX]
+    jil:
+      # insert_job Subcommand; job_type Attribute (BOX)
+      job_name: RISK_DAILY_BOX
+      job_type: BOX
+      owner: risk_ops@zia-batch01
+      permission: gx
+      group: RISK
+      application: RISK_ANALYTICS
+      date_conditions: y
+      start_times: "06:00"
+      days_of_week: all
+      run_calendar: every_day
       timezone: Europe/Zurich
-    command: null
-    condition: null
-    log_paths:
-      - /logs/autosys/RISK_DAILY_BOX.jil
-    resolved_command: null
-    resolved_parameters: {}
+      alarm_if_fail: 1
+      max_run_alarm: 120
+      n_retrys: 0
+      send_notification: N
+    run_instance:
+      status: SUCCESS
 
-  - name: RISK_DAILY_ETL
-    path: [RISK_DAILY_BOX, RISK_DAILY_ETL]
-    job_type: cmd
-    schedule:
-      expression: "5 6 * * *"
-      calendar: every_day
-    command: "/opt/risk/bin/risk_etl.sh --business-date %%$DATE%%"
-    condition: "s(RISK_FILE_WAIT_INCOMING)"
-    log_paths:
-      - /logs/autosys/RISK_DAILY_ETL.log
-      - /logs/autosys/RISK_DAILY_ETL.err
-    resolved_command: "/opt/risk/bin/risk_etl.sh --business-date 2026-10-02"
-    resolved_parameters:
-      DATE: "2026-10-02"
+  - path: [RISK_DAILY_BOX, RISK_FILE_WAIT_INCOMING]
+    jil:
+      # job_type Attribute (FW — File Watcher); machine Attribute
+      job_name: RISK_FILE_WAIT_INCOMING
+      job_type: FW
+      box_name: RISK_DAILY_BOX
+      machine: zia-batch01
+      owner: risk_ops@zia-batch01
+      permission: gx
+      watch_file: "/data/incoming/RISK_$${BUSINESS_DATE}.done"
+      date_conditions: y
+      start_mins: 1
+      days_of_week: all
+      run_calendar: every_day
+      std_out_file: /logs/autosys/RISK_FILE_WAIT_INCOMING.out
+      alarm_if_fail: 1
+      max_run_alarm: 30
+      n_retrys: 0
+      send_notification: N
+      group: RISK
+      application: RISK_ANALYTICS
+    run_instance:
+      status: SUCCESS
+      resolved_watch_file: /data/incoming/RISK_2026-10-02.done
+      global_variables:
+        BUSINESS_DATE: "2026-10-02"
 
-  - name: RISK_FILE_WAIT_INCOMING
-    path: [RISK_DAILY_BOX, RISK_FILE_WAIT_INCOMING]
-    job_type: fw
-    schedule:
-      raw: "start_mins: 1"
-    command: "/data/incoming/RISK_%%$DATE%%.done"
-    condition: null
-    log_paths:
-      - /logs/autosys/RISK_FILE_WAIT_INCOMING.log
-    resolved_command: "/data/incoming/RISK_2026-10-02.done"
-    resolved_parameters:
-      DATE: "2026-10-02"
+  - path: [RISK_DAILY_BOX, RISK_DAILY_ETL]
+    jil:
+      # command Attribute; condition Attribute (s() = success dependency)
+      job_name: RISK_DAILY_ETL
+      job_type: CMD
+      box_name: RISK_DAILY_BOX
+      machine: zia-batch01
+      owner: risk_ops@zia-batch01
+      permission: gx
+      command: "/opt/risk/bin/risk_etl.sh --business-date $${BUSINESS_DATE}"
+      condition: s(RISK_FILE_WAIT_INCOMING)
+      date_conditions: y
+      start_times: "06:05"
+      days_of_week: all
+      run_calendar: every_day
+      std_out_file: /logs/autosys/RISK_DAILY_ETL.out
+      std_err_file: /logs/autosys/RISK_DAILY_ETL.err
+      alarm_if_fail: 1
+      max_run_alarm: 90
+      n_retrys: 2
+      send_notification: Y
+      group: RISK
+      application: RISK_ANALYTICS
+    run_instance:
+      status: SUCCESS
+      resolved_command: "/opt/risk/bin/risk_etl.sh --business-date 2026-10-02"
+      global_variables:
+        BUSINESS_DATE: "2026-10-02"
 
-  - name: RISK_DOTNET_CALC
-    path: [RISK_DAILY_BOX, RISK_DOTNET_CALC]
-    job_type: cmd
-    schedule:
-      expression: "46 6 * * *"
-      calendar: every_day
-    command: "dotnet /opt/risk/RiskCalc.dll --mode daily --date %%$DATE%%"
-    condition: "s(RISK_DAILY_ETL)"
-    log_paths:
-      - /logs/autosys/RISK_DOTNET_CALC.log
-    resolved_command: "dotnet /opt/risk/RiskCalc.dll --mode daily --date 2026-10-02"
-    resolved_parameters:
-      DATE: "2026-10-02"
+  - path: [RISK_DAILY_BOX, RISK_DOTNET_CALC]
+    jil:
+      job_name: RISK_DOTNET_CALC
+      job_type: CMD
+      box_name: RISK_DAILY_BOX
+      machine: zia-batch01
+      owner: risk_ops@zia-batch01
+      permission: gx
+      command: "dotnet /opt/risk/RiskCalc.dll --mode daily --date $${BUSINESS_DATE}"
+      condition: s(RISK_DAILY_ETL)
+      date_conditions: y
+      start_times: "06:46"
+      days_of_week: all
+      run_calendar: every_day
+      std_out_file: /logs/autosys/RISK_DOTNET_CALC.out
+      std_err_file: /logs/autosys/RISK_DOTNET_CALC.err
+      alarm_if_fail: 1
+      max_run_alarm: 60
+      n_retrys: 1
+      send_notification: N
+      group: RISK
+      application: RISK_ANALYTICS
+    run_instance:
+      status: SUCCESS
+      resolved_command: "dotnet /opt/risk/RiskCalc.dll --mode daily --date 2026-10-02"
+      global_variables:
+        BUSINESS_DATE: "2026-10-02"
 
-  - name: RISK_DAILY_RECON
-    path: [RISK_DAILY_BOX, RISK_DAILY_RECON]
-    job_type: cmd
-    schedule:
-      expression: "50 6 * * *"
-      calendar: every_day
-    command: "/opt/risk/bin/recon.sh --date %%$DATE%%"
-    condition: "s(RISK_DOTNET_CALC)"
-    log_paths:
-      - /logs/autosys/RISK_DAILY_RECON.log
-      - /logs/autosys/RISK_DAILY_RECON.err
-    resolved_command: "/opt/risk/bin/recon.sh --date 2026-10-02"
-    resolved_parameters:
-      DATE: "2026-10-02"
+  - path: [RISK_DAILY_BOX, RISK_DAILY_RECON]
+    jil:
+      job_name: RISK_DAILY_RECON
+      job_type: CMD
+      box_name: RISK_DAILY_BOX
+      machine: zia-batch01
+      owner: risk_ops@zia-batch01
+      permission: gx
+      command: "/opt/risk/bin/recon.sh --date $${BUSINESS_DATE}"
+      condition: s(RISK_DOTNET_CALC)
+      date_conditions: y
+      start_times: "06:50"
+      days_of_week: all
+      run_calendar: every_day
+      std_out_file: /logs/autosys/RISK_DAILY_RECON.out
+      std_err_file: /logs/autosys/RISK_DAILY_RECON.err
+      alarm_if_fail: 1
+      max_run_alarm: 45
+      n_retrys: 0
+      send_notification: Y
+      group: RISK
+      application: RISK_ANALYTICS
+    run_instance:
+      status: SUCCESS
+      resolved_command: "/opt/risk/bin/recon.sh --date 2026-10-02"
+      global_variables:
+        BUSINESS_DATE: "2026-10-02"
 
-  - name: RISK_LEGACY_REPORT
-    path: [RISK_DAILY_BOX, RISK_LEGACY_REPORT]
-    job_type: cmd
-    schedule:
-      expression: "56 6 * * 1-5"
-      calendar: weekdays
-    command: "/opt/risk/legacy/report.sh"
-    condition: "s(RISK_DAILY_RECON)"
-    log_paths:
-      - /logs/autosys/RISK_LEGACY_REPORT.log
-    resolved_command: "/opt/risk/legacy/report.sh"
-    resolved_parameters: {}
+  - path: [RISK_DAILY_BOX, RISK_LEGACY_REPORT]
+    jil:
+      # days_of_week Attribute — weekday-only variant (mo–fr)
+      job_name: RISK_LEGACY_REPORT
+      job_type: CMD
+      box_name: RISK_DAILY_BOX
+      machine: zia-batch01
+      owner: risk_ops@zia-batch01
+      permission: gx
+      command: "/opt/risk/legacy/report.sh"
+      condition: s(RISK_DAILY_RECON)
+      date_conditions: y
+      start_times: "06:56"
+      days_of_week: mo,tu,we,th,fr
+      run_calendar: weekdays
+      std_out_file: /logs/autosys/RISK_LEGACY_REPORT.out
+      std_err_file: /logs/autosys/RISK_LEGACY_REPORT.err
+      alarm_if_fail: 1
+      max_run_alarm: 30
+      n_retrys: 0
+      send_notification: N
+      group: RISK
+      application: RISK_ANALYTICS
+    run_instance:
+      status: SUCCESS
+      resolved_command: "/opt/risk/legacy/report.sh"
+      global_variables: {}

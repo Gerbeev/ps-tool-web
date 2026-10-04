@@ -25,7 +25,7 @@ jobs:
     command: "/opt/risk/bin/risk_etl.sh --business-date {BusinessDate}"
     condition: "Finish(RiskDaily.FileWaitIncoming)"
     log_paths:
-      - /logs/ps/RiskDaily.EtlJob.log
+      - /logs/ps/RiskDaily.EtlJob.out
       - /logs/ps/RiskDaily.EtlJob.err
     resolved_command: "/opt/risk/bin/risk_etl.sh --business-date 2026-10-02"
     resolved_parameters:
@@ -39,7 +39,7 @@ jobs:
     command: "/data/incoming/RISK_{BusinessDate}.done"
     condition: null
     log_paths:
-      - /logs/ps/RiskDaily.FileWaitIncoming.log
+      - /logs/ps/RiskDaily.FileWaitIncoming.out
     resolved_command: "/data/incoming/RISK_2026-10-02.done"
     resolved_parameters:
       BusinessDate: "2026-10-02"
@@ -53,7 +53,7 @@ jobs:
     command: "dotnet /opt/risk/RiskCalc.dll --mode daily --date {BusinessDate}"
     condition: "Finish(RiskDaily.EtlJob)"
     log_paths:
-      - /logs/ps/RiskDaily.DotNetCalc.log
+      - /logs/ps/RiskDaily.DotNetCalc.out
     resolved_command: "dotnet /opt/risk/RiskCalc.dll --mode daily --date 2026-10-02"
     resolved_parameters:
       BusinessDate: "2026-10-02"
@@ -67,7 +67,7 @@ jobs:
     command: "/opt/risk/bin/recon.sh --date {BusinessDate}"
     condition: "Finish(RiskDaily.DotNetCalc)"
     log_paths:
-      - /logs/ps/RiskDaily.ReconJob.log
+      - /logs/ps/RiskDaily.ReconJob.out
       - /logs/ps/RiskDaily.ReconJob.err
     resolved_command: "/opt/risk/bin/recon.sh --date 2026-10-02"
     resolved_parameters:
