@@ -47,8 +47,6 @@ def iter_table_rows(
 
     if filter_name in ("all", "matched", "mismatches", "status_delta"):
         for pair in result.pairs:
-            if filter_name == "matched" and pair.left and pair.right and pair.left.status != pair.right.status:
-                continue
             if filter_name == "status_delta" and (
                 not pair.left or not pair.right or pair.left.status == pair.right.status
             ):

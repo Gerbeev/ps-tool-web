@@ -20,10 +20,20 @@ def build_children_index(roots: list[JobNode]) -> dict[str, list[str]]:
     return index
 
 
+def _indexes_match_snapshot(snapshot: TopologySnapshot) -> bool:
+    by_uid = snapshot.metadata.get("jobs_by_uid")
+    if not isinstance(by_uid, dict):
+        return False
+    expected = {j.job_uid for j in snapshot.flat_jobs}
+    return set(by_uid) == expected and snapshot.metadata.get("children_index") is not None
+
+
 def ensure_topology_indexes(snapshot: TopologySnapshot) -> None:
     """Populate metadata indexes used by lazy tree and exports."""
-    if snapshot.metadata.get("children_index") is not None:
+    if _indexes_match_snapshot(snapshot):
         return
+    snapshot.metadata.pop("children_index", None)
+    snapshot.metadata.pop("jobs_by_uid", None)
     snapshot.metadata["children_index"] = build_children_index(snapshot.roots)
     snapshot.metadata["jobs_by_uid"] = {j.job_uid: j for j in snapshot.flat_jobs}
 
@@ -41,8 +51,13 @@ def get_child_nodes(snapshot: TopologySnapshot, parent_uid: str) -> list[JobNode
     by_uid: dict[str, SnapshotJob] = snapshot.metadata.get("jobs_by_uid") or {
         j.job_uid: j for j in snapshot.flat_jobs
     }
+    allowed = {j.job_uid for j in snapshot.flat_jobs}
     child_uids = index.get(parent_uid, [])
-    return [JobNode(job=by_uid[uid], children=[]) for uid in child_uids if uid in by_uid]
+    return [
+        JobNode(job=by_uid[uid], children=[])
+        for uid in child_uids
+        if uid in by_uid and uid in allowed
+    ]
 
 
 def lazy_roots(snapshot: TopologySnapshot) -> list[JobNode]:

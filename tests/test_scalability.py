@@ -76,6 +76,9 @@ def test_compare_table_endpoint_all_by_default():
     assert table.status_code == 200
     assert "compare-table" in table.text
 
+    bad_side = client.get(f"/api/tree/not-a-side?session_id={sid}")
+    assert bad_side.status_code == 404
+
 
 def test_children_index_o1_lookup():
     left = ComparisonContext(

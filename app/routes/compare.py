@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Form, Query, Request
+from fastapi import APIRouter, Form, HTTPException, Query, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
@@ -45,6 +45,14 @@ def _parameter_mismatches_by_logical_id(result) -> dict[str, list]:
             continue
         out.setdefault(m.logical_id, []).append(m)
     return out
+
+
+def _snapshot_for_side(session: CompareSession, side: str):
+    if side == "left":
+        return session.left_snapshot
+    if side == "right":
+        return session.right_snapshot
+    raise HTTPException(status_code=404, detail="Unknown side; use left or right")
 
 
 def _mismatch_logical_ids(result) -> set[str]:
@@ -184,7 +192,7 @@ async def tree_partial(request: Request, side: str, session_id: str, parent_uid:
     session = session_store.get(session_id)
     if not session:
         return HTMLResponse("<p>Session expired. Run Compare again.</p>", status_code=404)
-    snap = session.left_snapshot if side == "left" else session.right_snapshot
+    snap = _snapshot_for_side(session, side)
     mismatch_ids = _mismatch_logical_ids(session.result)
     if not parent_uid:
         nodes = lazy_roots(snap)
@@ -210,7 +218,7 @@ async def job_detail(request: Request, side: str, uid: str, session_id: str):
     session = session_store.get(session_id)
     if not session:
         return HTMLResponse("<p>Session expired.</p>", status_code=404)
-    snap = session.left_snapshot if side == "left" else session.right_snapshot
+    snap = _snapshot_for_side(session, side)
     job = next((j for j in snap.flat_jobs if j.job_uid == uid), None)
     if not job:
         return HTMLResponse("<p>Job not found.</p>", status_code=404)
