@@ -55,16 +55,18 @@
       </div>
     </div>
   </div>
-  <div class="box box--inset browse-tree-list">
-  <div class="box__pad browse-tree-scroll">
-  <div class="browse-tree-header" aria-hidden="true">
-    <span class="browse-col browse-col-expand"></span>
-    <span class="browse-col browse-col-name">Job</span>
-    <span class="browse-col browse-col-status">Status</span>
-    <span class="browse-col browse-col-start">Start</span>
-    <span class="browse-col browse-col-end">End</span>
+  <div class="box box--inset compare-table-list browse-tree-list">
+    <div class="box__pad">
+      <div class="compare-table-data browse-tree-data">
+        <div class="browse-tree-scroll" role="grid" aria-label="Jobs">
+  <div class="browse-tree-header browse-row-grid" role="row">
+    <span class="browse-col browse-col-expand" role="columnheader" aria-hidden="true"></span>
+    <span class="browse-col browse-col-name" role="columnheader">Job</span>
+    <span class="browse-col browse-col-status" role="columnheader">Status</span>
+    <span class="browse-col browse-col-start" role="columnheader">Start</span>
+    <span class="browse-col browse-col-end" role="columnheader">End</span>
   </div>
-  <div class="browse-tree-body">
+  <div id="browse-tree-body" class="browse-tree-body">
   {% set display_roots = roots if roots is defined else snapshot.roots %}
   {{ render_browse_nodes(
       display_roots,
@@ -75,7 +77,9 @@
       depth|default(0)
   ) }}
   </div>
-  </div>
+        </div>
+      </div>
+    </div>
   </div>
 </div>
 {% else %}

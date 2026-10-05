@@ -681,6 +681,13 @@ input[type="search"]::-webkit-search-results-decoration {
   min-width: 0;
 }
 
+.box-page .compare-table-list .compare-table-data {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
 .box-page .compare-table-meta {
   margin: 0 0 var(--box-gap);
   line-height: 1.4;
@@ -715,6 +722,24 @@ input[type="search"]::-webkit-search-results-decoration {
   width: 100%;
   margin: 0;
   font-size: 0.875rem;
+}
+
+.box-page .compare-table-list.box--inset:focus,
+.box-page .compare-table-list.box--inset:focus-within {
+  border-color: var(--app-border);
+  outline: none;
+  box-shadow: none;
+}
+
+.box-page .compare-table-list .compare-table th,
+.box-page .compare-table-list .compare-table td {
+  border-color: var(--app-border);
+}
+
+.box-page .compare-table-list .compare-table:focus,
+.box-page .compare-table-list .compare-table:focus-within {
+  outline: none;
+  box-shadow: none;
 }
 
 tr.compare-filter-hidden {
@@ -974,6 +999,7 @@ tr.compare-filter-hidden {
   box-sizing: border-box;
 }
 
+.browse-tree-pane > .compare-table-list.box,
 .browse-tree-pane > .browse-tree-list.box {
   flex: 1;
   min-height: 0;
@@ -982,6 +1008,15 @@ tr.compare-filter-hidden {
   overflow: hidden;
 }
 
+.browse-tree-pane > .compare-table-list .box__pad,
+.browse-tree-pane > .browse-tree-list .box__pad {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.browse-tree-pane > .compare-table-list .browse-tree-scroll,
 .browse-tree-pane > .browse-tree-list .browse-tree-scroll {
   flex: 1;
   min-height: 0;
@@ -1282,6 +1317,16 @@ tr.compare-filter-hidden {
 
 .browse-row-grid.browse-job-row {
   cursor: pointer;
+  margin: 0;
+  padding: 0;
+  border: none;
+  border-bottom: 1px solid var(--app-border);
+  border-radius: 0;
+  box-shadow: none;
+  background-color: var(--app-content-bg);
+  color: var(--app-text);
+  font-weight: inherit;
+  text-align: inherit;
 }
 
 .browse-job-row:hover,
@@ -1291,6 +1336,26 @@ tr.compare-filter-hidden {
 
 .browse-job-row:focus,
 .browse-job-row:focus-visible {
+  outline: none;
+  box-shadow: none;
+  --pico-box-shadow: none;
+}
+
+.browse-tree-scroll[role="grid"] .browse-job-row:focus,
+.browse-tree-scroll[role="grid"] .browse-job-row:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.box-page #browse-output:focus,
+.box-page #browse-output:focus-visible {
+  outline: none;
+  box-shadow: none;
+}
+
+.box-page .box-output:focus,
+.box-page .box-output:focus-within {
+  border-color: var(--app-border);
   outline: none;
   box-shadow: none;
 }
