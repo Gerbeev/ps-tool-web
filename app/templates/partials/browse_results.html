@@ -1,8 +1,8 @@
 <input type="hidden" id="session-id" name="session_id" value="{{ session_id }}">
-<header class="browse-results-head browse-band">
+<header class="browse-results-head browse-box__section browse-box__pad">
   <p class="browse-meta"><strong>{{ meta_line }}</strong> · {{ snapshot.flat_jobs|length }} jobs</p>
 </header>
-<div id="browse-workspace" class="browse-workspace">
+<div id="browse-workspace" class="browse-workspace browse-box__section">
   <div class="browse-tree-column">
     <div class="browse-tree-wrap">
       {% with snapshot=snapshot, side='browse', session_id=session_id, job_api_base='/api/browse/job', tree_api_base='/api/browse/tree', tree_layout='browse' %}

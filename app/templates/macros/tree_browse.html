@@ -3,7 +3,7 @@
 {% set n_children = tree_child_count(snapshot, job.job_uid) %}
 {% set branch_open = depth < 2 %}
 <div class="browse-tree-node" style="--browse-depth: {{ depth }}">
-  <div class="browse-row-grid browse-band-content browse-job-row"
+  <div class="browse-row-grid browse-job-row"
        role="button"
        tabindex="0"
        data-job-name="{{ job.scheduler_job_name }}"
