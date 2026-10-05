@@ -1,41 +1,60 @@
-# Process Scheduler → AutoSys JIL mapping
+# Process Scheduler Endpoint -> AutoSys Migration-Parity Mapping
 
-Reference model: `AutoSysJobReference` (`app/autosys_reference.py`) on each `SnapshotJob`.
+Process Scheduler is a custom .NET/C# scheduler exposed to this tool through a bank-internal endpoint. The endpoint is the source contract for the adapter. Its internal Cosmos DB/storage representation is intentionally opaque to `ps-tool-web`.
 
-Comparison uses **official AutoSys JIL / run attribute names** — not a parallel normalized schema. Process Scheduler adapters map migrated job definitions into `autosys_reference` (see `examples/process_scheduler_jobs.sample.yaml`).
+The adapter must map endpoint DTOs into the shared scheduler model and separately build an AutoSys-equivalent parity projection where semantics are genuinely comparable.
 
-## Identity (unchanged)
+## Core Mapping
 
-| Concept | AutoSys | Process Scheduler |
-|---------|---------|-------------------|
-| Logical pairing | `config/identity_map.yaml` | Same map |
-| Path | box / job path | topology / job path |
+| Process Scheduler endpoint concept | Engine field |
+|---|---|
+| stable job/node ID | `SnapshotJob.job_uid` / `scheduler_native_id` |
+| display/business job name | `scheduler_job_name` |
+| topology/container parent | `parent_uid` |
+| explicit predecessor/trigger relation | `DependencyEdge` |
+| native execution state | normalized `status` + original `status_raw` |
+| native command/.NET invocation | `autosys.jil.command` when semantically comparable |
+| native schedule/calendar | corresponding AutoSys-equivalent scheduling fields |
+| runtime command/parameters | `autosys.run.resolved_command` and runtime fields |
+| source-specific endpoint metadata | `attributes` |
 
-## Definition mapping (PS native → JIL reference)
+## Dependency Mapping
 
-| JIL parameter | Process Scheduler source (typical) |
-|---------------|-------------------------------------|
-| `job_type` | PS job type → CMD / FW / BOX equivalent |
-| `machine` | Agent / host binding |
-| `box_name` | Parent topology / box name |
-| `command` | Script / .NET command line |
-| `watch_file` | File-wait path |
-| `condition` | Dependency → `s()` / `d()` AutoSys expression |
-| `date_conditions` | `y` when schedule active |
-| `start_times` | Cron / schedule → `HH:MM` |
-| `start_mins` | Offset minutes |
-| `days_of_week` | Cron DOW → `all` / `mo,tu,...` |
-| `run_calendar` | Calendar id |
-| `timezone` | Job timezone |
-| `std_out_file` / `std_err_file` | Log path list |
-| `owner`, `permission`, `group`, `application` | Metadata from migration target |
+Dependency mapping is mandatory when the Process Scheduler endpoint exposes dependency semantics.
 
-## Run instance mapping
+Do not infer a dependency merely because nodes are returned in a particular order or because one job is nested inside the same topology/container as another. Structural containment and execution prerequisites are separate concepts.
 
-| Run parameter | Source |
-|---------------|--------|
-| `status` | Native run status string |
-| `resolved_command` | Command after `{BusinessDate}` / `$${GLOBAL}` substitution |
-| `actual_start` / `actual_end` | Instance timestamps on snapshot |
+If the endpoint exposes richer dependency semantics than `DependencyEdge` can safely represent, preserve the native form in `attributes`, project any equivalent AutoSys condition where valid, and mark unsupported portions as `UNKNOWN`/`UNSUPPORTED` rather than inventing equivalence.
 
-Full compare list: `docs/autosys-compare-parameters.md` and `config/autosys_compare_parameters.yaml`.
+## AutoSys-Equivalent Projection
+
+For Process Scheduler jobs, populate only fields that can be defended semantically against AutoSys. Typical candidates include:
+
+- command / executable invocation;
+- machine/target execution context if comparable;
+- parent/topology membership;
+- schedule/calendar/time-window semantics;
+- retry/timeout semantics;
+- file-watcher semantics;
+- runtime status, timings and exit code;
+- explicit predecessor dependencies.
+
+A Process Scheduler-native field with no AutoSys equivalent belongs in `attributes`; it should not be forced into an unrelated JIL field.
+
+## Evidence
+
+For non-obvious mappings, use endpoint DTO paths/field names rather than storage locations:
+
+```python
+FieldEvidence(
+    source="process_scheduler_endpoint",
+    locator="topology.nodes[].execution.command",
+    note="Mapped from endpoint execution DTO",
+)
+```
+
+Do not include full endpoint payloads, secrets, commands containing credentials, or sensitive log content.
+
+## Identity
+
+Logical job pairing remains controlled centrally by `config/identity_map.yaml` and normalization rules. Native endpoint IDs should be retained as `scheduler_native_id`; they should not replace verified cross-scheduler business identity unless the same stable ID is genuinely shared across both systems.

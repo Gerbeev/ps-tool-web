@@ -15,9 +15,13 @@ from app.context_helpers import (
     topology_options,
 )
 from app.search.sqlite_fts import search_index
-from app.services.comparison import compare_contexts, fetch_snapshot, job_status_css
-from app.services.table_rows import iter_table_rows, page_table_rows
-from app.services.topology_index import child_count, get_child_nodes, lazy_roots
+from app.services.comparison import compare_snapshots, fetch_snapshot, job_status_css
+from app.services.table_rows import (
+    iter_table_rows,
+    page_table_rows,
+    parameter_mismatches_by_logical_id,
+)
+from app.services.topology_index import child_count, get_child_nodes, get_job, lazy_roots
 from app.session_store import CompareSession, session_store
 
 router = APIRouter()
@@ -44,15 +48,6 @@ def _side_form_context(environment_id: str, as_of: str = "", topology: str = "")
 
 def _env_options():
     return load_environments()
-
-
-def _parameter_mismatches_by_logical_id(result) -> dict[str, list]:
-    out: dict[str, list] = {}
-    for m in result.parameter_mismatches:
-        if not m.logical_id:
-            continue
-        out.setdefault(m.logical_id, []).append(m)
-    return out
 
 
 def _snapshot_for_side(session: CompareSession, side: str):
@@ -146,7 +141,7 @@ async def run_compare(
     right = parse_compare_side_context(right_env, right_scheduler, right_as_of, right_topology)
     left_snap, _ = fetch_snapshot(left)
     right_snap, _ = fetch_snapshot(right)
-    result = compare_contexts(left, right)
+    result = compare_snapshots(left_snap, right_snap)
     search_index.rebuild(left_snap, "left")
     search_index.rebuild(right_snap, "right")
     sid = session_store.new_id()
@@ -201,7 +196,7 @@ async def compare_table(
             "total": total,
             "q_prefix": q_prefix,
             "default_limit": settings.table_page_size_default,
-            "param_mismatches_by_id": _parameter_mismatches_by_logical_id(session.result),
+            "param_mismatches_by_id": parameter_mismatches_by_logical_id(session.result),
         },
     )
 
@@ -258,7 +253,7 @@ async def job_detail(request: Request, side: str, uid: str, session_id: str):
     if not session:
         return HTMLResponse("<p>Session expired.</p>", status_code=404)
     snap = _snapshot_for_side(session, side)
-    job = next((j for j in snap.flat_jobs if j.job_uid == uid), None)
+    job = get_job(snap, uid)
     if not job:
         return HTMLResponse("<p>Job not found.</p>", status_code=404)
     return templates.TemplateResponse(

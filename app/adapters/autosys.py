@@ -1,4 +1,4 @@
-"""Mock AutoSys adapter for Phase 2 demos."""
+"""Mock AutoSys adapter for local development and contract tests."""
 
 from __future__ import annotations
 

@@ -2,6 +2,17 @@
   {% include "partials/summary.html" %}
 </div>
 
+{% if result.summary.identity_conflicts > 0 %}
+<div class="box__section box__pad">
+  <p class="small"><strong>Identity conflicts:</strong> {{ result.summary.identity_conflicts }} logical IDs map to multiple jobs and were excluded from automatic pairing. Resolve identity mappings before treating the comparison as complete.</p>
+</div>
+{% endif %}
+{% if result.summary.not_comparable_parameters > 0 %}
+<div class="box__section box__pad">
+  <p class="muted small"><strong>Partial coverage:</strong> {{ result.summary.not_comparable_parameters }} field comparisons were skipped because at least one adapter declared the field unsupported, unknown, or not applicable. They are not counted as mismatches.</p>
+</div>
+{% endif %}
+
 <div class="box__section box__pad export-row">
   <a role="button" class="outline"
      href="/api/export/left.csv?session_id={{ session_id }}">Export Left CSV</a>

@@ -5,7 +5,7 @@ from __future__ import annotations
 from datetime import date
 
 from app.adapters.factory import get_adapter
-from app.config import host_for_environment, scheduler_for_environment
+from app.config import endpoint_for_environment, scheduler_for_environment
 from app.models import ComparisonContext, ContextFilters, SchedulerType
 
 
@@ -43,7 +43,7 @@ def parse_browse_context(
         filters.root_box = "RISK_DAILY_BOX"
     return ComparisonContext(
         environment_id=environment_id,
-        host=host_for_environment(environment_id),
+        endpoint_url=endpoint_for_environment(environment_id),
         scheduler=sched,
         as_of=_as_of(as_of),
         filters=filters,
@@ -68,7 +68,7 @@ def parse_compare_side_context(
         filters.root_box = root_box or "RISK_DAILY_BOX"
     return ComparisonContext(
         environment_id=environment_id,
-        host=host_for_environment(environment_id),
+        endpoint_url=endpoint_for_environment(environment_id),
         scheduler=sched,
         as_of=_as_of(as_of or default_business_date()),
         filters=filters,

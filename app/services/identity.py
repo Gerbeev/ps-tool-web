@@ -35,14 +35,13 @@ def logical_id_for_job(job: SnapshotJob, scheduler: SchedulerType) -> tuple[str 
             m = re.match(rule.pattern, name)
             if m:
                 ps_name = m.expand(rule.ps_replacement)
-                logical = f"regex:{name}|{ps_name}"
-                return logical, MatchConfidence.NORMALIZED
+                return _normalize_name(ps_name), MatchConfidence.NORMALIZED
 
     normalized_name = _normalize_name(name)
     if normalized_name != name:
-        return f"norm:{normalized_name}", MatchConfidence.NORMALIZED
+        return normalized_name, MatchConfidence.NORMALIZED
 
-    return name, MatchConfidence.NAME_ONLY
+    return normalized_name, MatchConfidence.NAME_ONLY
 
 
 def _normalize_name(name: str) -> str:
@@ -56,7 +55,12 @@ def _normalize_name(name: str) -> str:
     return result
 
 
-def annotate_snapshot_jobs(jobs: list[SnapshotJob], scheduler: SchedulerType) -> None:
+def annotate_snapshot_jobs(
+    jobs: list[SnapshotJob], scheduler: SchedulerType
+) -> dict[str, MatchConfidence]:
+    confidence_by_uid: dict[str, MatchConfidence] = {}
     for job in jobs:
-        lid, _conf = logical_id_for_job(job, scheduler)
+        lid, confidence = logical_id_for_job(job, scheduler)
         job.logical_id = lid
+        confidence_by_uid[job.job_uid] = confidence
+    return confidence_by_uid

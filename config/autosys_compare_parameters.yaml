@@ -1,33 +1,73 @@
-# AutoSys JIL / run attributes used for migration parity comparison.
-# Parameter names must match Broadcom AE JIL attribute names or documented run fields.
+# AutoSys attributes used for migration parity comparison.
+# Values are compared semantically where AutoSys accepts equivalent syntax
+# (for example CMD/C, y/1/true, success(job)/s(job), or reordered time/code lists).
 timing_threshold_sec: 60
 
 jil_parameters:
+  # Identity / placement / execution target
   - job_type
   - machine
   - box_name
+
+  # Execution definition
   - command
   - watch_file
   - condition
+  - profile
+  - envvars
+  - exit_code_policy
+
+  # Date/time scheduling
   - date_conditions
   - start_times
   - start_mins
   - days_of_week
   - run_calendar
+  - exclude_calendar
+  - run_window
+  - must_start_times
+  - must_complete_times
   - timezone
+
+  # File Watcher semantics
+  - watch_interval
+  - watch_file_min_size
+
+  # Box / flow control
+  - box_success
+  - box_failure
+  - box_terminator
+  - job_terminator
+
+  # Output / security / workload metadata
   - std_out_file
   - std_err_file
   - owner
   - permission
   - group
   - application
+  - priority
+  - resources
+
+  # Retry / runtime controls / alarms
   - alarm_if_fail
+  - alarm_if_terminated
+  - min_run_alarm
   - max_run_alarm
+  - term_run_time
   - n_retrys
   - send_notification
+  - notification_id
+  - notification_msg
+  - notification_template
+  - notification_alarm_types
+  - auto_hold
+  - auto_delete
 
 run_parameters:
-  - status
+  # Top-level SnapshotJob.status is the normalized cross-scheduler status.
+  # Raw AutoSys/PS status strings are deliberately not compared here.
   - resolved_command
+  - exit_code
   - actual_start
   - actual_end

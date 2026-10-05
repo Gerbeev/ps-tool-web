@@ -6,6 +6,7 @@ import re
 import sqlite3
 from abc import ABC, abstractmethod
 from pathlib import Path
+from threading import RLock
 
 from app.config import get_settings
 from app.models import SearchHit, TopologySnapshot
@@ -46,29 +47,28 @@ class SQLiteFTSSearchIndex(SearchIndex):
         self._path.parent.mkdir(parents=True, exist_ok=True)
         self._conn = sqlite3.connect(str(self._path), check_same_thread=False)
         self._conn.row_factory = sqlite3.Row
+        self._lock = RLock()
         self._init_schema()
 
     def _init_schema(self) -> None:
-        cur = self._conn.cursor()
-        cur.execute(
-            """
-            CREATE VIRTUAL TABLE IF NOT EXISTS jobs_fts USING fts5(
-                job_uid UNINDEXED,
-                side UNINDEXED,
-                snapshot_id UNINDEXED,
-                name,
-                path,
-                status,
-                body,
-                tokenize='unicode61'
+        with self._lock, self._conn:
+            self._conn.execute(
+                """
+                CREATE VIRTUAL TABLE IF NOT EXISTS jobs_fts USING fts5(
+                    job_uid UNINDEXED,
+                    side UNINDEXED,
+                    snapshot_id UNINDEXED,
+                    name,
+                    path,
+                    status,
+                    body,
+                    tokenize='unicode61'
+                )
+                """
             )
-            """
-        )
-        self._conn.commit()
 
     def rebuild(self, snapshot: TopologySnapshot, side: str) -> None:
-        cur = self._conn.cursor()
-        cur.execute("DELETE FROM jobs_fts WHERE side = ? AND snapshot_id = ?", (side, snapshot.snapshot_id))
+        rows: list[tuple[str, str, str, str, str, str, str]] = []
         for job in snapshot.flat_jobs:
             path = "/".join(job.path_labels)
             jil = job.autosys.jil
@@ -93,11 +93,7 @@ class SQLiteFTSSearchIndex(SearchIndex):
                     ],
                 )
             )
-            cur.execute(
-                """
-                INSERT INTO jobs_fts (job_uid, side, snapshot_id, name, path, status, body)
-                VALUES (?, ?, ?, ?, ?, ?, ?)
-                """,
+            rows.append(
                 (
                     job.job_uid,
                     side,
@@ -106,9 +102,21 @@ class SQLiteFTSSearchIndex(SearchIndex):
                     path,
                     job.status.value,
                     body,
-                ),
+                )
             )
-        self._conn.commit()
+
+        with self._lock, self._conn:
+            self._conn.execute(
+                "DELETE FROM jobs_fts WHERE side = ? AND snapshot_id = ?",
+                (side, snapshot.snapshot_id),
+            )
+            self._conn.executemany(
+                """
+                INSERT INTO jobs_fts (job_uid, side, snapshot_id, name, path, status, body)
+                VALUES (?, ?, ?, ?, ?, ?, ?)
+                """,
+                rows,
+            )
 
     def search(
         self,
@@ -123,7 +131,6 @@ class SQLiteFTSSearchIndex(SearchIndex):
             return []
         if snapshot_ids is not None and not snapshot_ids:
             return []
-        cur = self._conn.cursor()
         sql = """
                 SELECT job_uid, side, snapshot_id, name, path, status, body,
                        bm25(jobs_fts) AS rank
@@ -140,12 +147,13 @@ class SQLiteFTSSearchIndex(SearchIndex):
             params.append(side)
         sql += " ORDER BY rank LIMIT ?"
         params.append(limit)
-        try:
-            cur.execute(sql, params)
-        except sqlite3.OperationalError:
-            return []
+        with self._lock:
+            try:
+                rows = self._conn.execute(sql, params).fetchall()
+            except sqlite3.OperationalError:
+                return []
         hits: list[SearchHit] = []
-        for row in cur.fetchall():
+        for row in rows:
             hits.append(
                 SearchHit(
                     job_uid=row["job_uid"],

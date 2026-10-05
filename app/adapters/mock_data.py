@@ -58,12 +58,13 @@ def _job(
     )
     if not ref.jil.job_name:
         ref.jil.job_name = name
-    if not ref.jil.job_type:
-        ref.jil.job_type = job_type.upper() if job_type != "box" else "BOX"
-    if not ref.jil.machine and machine:
-        ref.jil.machine = machine
-    if not ref.jil.std_out_file:
-        ref.jil.std_out_file = f"/logs/{side}/{name}{log_suffix}"
+    if not examples:
+        if not ref.jil.job_type:
+            ref.jil.job_type = job_type.upper() if job_type != "box" else "BOX"
+        if not ref.jil.machine and machine:
+            ref.jil.machine = machine
+        if not ref.jil.std_out_file:
+            ref.jil.std_out_file = f"/logs/{side}/{name}{log_suffix}"
     if not ref.run.status:
         ref.run.status = status_raw
     native_type = job_type if not examples else None
@@ -140,6 +141,7 @@ def apply_root_scope(snap: TopologySnapshot, root_name: str | None) -> TopologyS
         roots=[subtree],
         flat_jobs=flat,
         edges=edges,
+        capabilities=snap.capabilities,
         metadata=meta,
     )
 
@@ -177,7 +179,6 @@ def build_large_autosys_snapshot(context: ComparisonContext, job_count: int) -> 
         )
         flat.append(job)
         children.append(JobNode(job=job))
-        edges.append(DependencyEdge(from_uid=box.job_uid, to_uid=job.job_uid))
     return TopologySnapshot(
         context=context,
         roots=[JobNode(job=box, children=children)],
@@ -219,7 +220,6 @@ def build_large_ps_snapshot(context: ComparisonContext, job_count: int) -> Topol
         )
         flat.append(job)
         children.append(JobNode(job=job))
-        edges.append(DependencyEdge(from_uid=topo.job_uid, to_uid=job.job_uid))
     return TopologySnapshot(
         context=context,
         roots=[JobNode(job=topo, children=children)],
@@ -342,11 +342,30 @@ def build_autosys_snapshot(context: ComparisonContext) -> TopologySnapshot:
     ]
     flat = [box, etl, file_wait, dotnet, recon, legacy_only]
     edges = [
-        DependencyEdge(from_uid=box.job_uid, to_uid=etl.job_uid),
-        DependencyEdge(from_uid=box.job_uid, to_uid=file_wait.job_uid),
-        DependencyEdge(from_uid=etl.job_uid, to_uid=dotnet.job_uid),
-        DependencyEdge(from_uid=dotnet.job_uid, to_uid=recon.job_uid),
-        DependencyEdge(from_uid=box.job_uid, to_uid=legacy_only.job_uid),
+        DependencyEdge(
+            from_uid=file_wait.job_uid,
+            to_uid=etl.job_uid,
+            kind=DependencyKind.FINISH_TO_START,
+            condition="success",
+        ),
+        DependencyEdge(
+            from_uid=etl.job_uid,
+            to_uid=dotnet.job_uid,
+            kind=DependencyKind.FINISH_TO_START,
+            condition="success",
+        ),
+        DependencyEdge(
+            from_uid=dotnet.job_uid,
+            to_uid=recon.job_uid,
+            kind=DependencyKind.FINISH_TO_START,
+            condition="success",
+        ),
+        DependencyEdge(
+            from_uid=recon.job_uid,
+            to_uid=legacy_only.job_uid,
+            kind=DependencyKind.FINISH_TO_START,
+            condition="success",
+        ),
     ]
     snap = TopologySnapshot(
         context=context,
@@ -411,7 +430,7 @@ def build_ps_weekly_snapshot(context: ComparisonContext) -> TopologySnapshot:
         context=context,
         roots=roots,
         flat_jobs=flat,
-        edges=[DependencyEdge(from_uid=topo.job_uid, to_uid=rollup.job_uid)],
+        edges=[],
         metadata={
             "adapter": "process_scheduler_mock",
             "connector_version": "0.0-mock",
@@ -529,11 +548,30 @@ def build_ps_daily_snapshot(context: ComparisonContext) -> TopologySnapshot:
     ]
     flat = [topo, etl, file_wait, dotnet, recon, extra, orphan]
     edges = [
-        DependencyEdge(from_uid=topo.job_uid, to_uid=etl.job_uid, kind=DependencyKind.FINISH_TO_START),
-        DependencyEdge(from_uid=topo.job_uid, to_uid=file_wait.job_uid, kind=DependencyKind.FILE_TRIGGER),
-        DependencyEdge(from_uid=etl.job_uid, to_uid=dotnet.job_uid),
-        DependencyEdge(from_uid=dotnet.job_uid, to_uid=recon.job_uid),
-        DependencyEdge(from_uid=topo.job_uid, to_uid=extra.job_uid),
+        DependencyEdge(
+            from_uid=file_wait.job_uid,
+            to_uid=etl.job_uid,
+            kind=DependencyKind.FINISH_TO_START,
+            condition="success",
+        ),
+        DependencyEdge(
+            from_uid=etl.job_uid,
+            to_uid=dotnet.job_uid,
+            kind=DependencyKind.FINISH_TO_START,
+            condition="success",
+        ),
+        DependencyEdge(
+            from_uid=dotnet.job_uid,
+            to_uid=recon.job_uid,
+            kind=DependencyKind.FINISH_TO_START,
+            condition="success",
+        ),
+        DependencyEdge(
+            from_uid=recon.job_uid,
+            to_uid=extra.job_uid,
+            kind=DependencyKind.FINISH_TO_START,
+            condition="success",
+        ),
     ]
     return TopologySnapshot(
         context=context,

@@ -26,6 +26,9 @@
 </div>
 <p class="muted small box-note box-note--after">
   Left jobs: {{ result.summary.total_left }} · Right jobs: {{ result.summary.total_right }}
+  · Parameter diffs: {{ result.summary.mismatched_parameters }}
+  · Not comparable: {{ result.summary.not_comparable_parameters }}
+  · Identity conflicts: {{ result.summary.identity_conflicts }}
   · Snapshots {{ result.left_snapshot_id[:8] }} / {{ result.right_snapshot_id[:8] }}
   · <button type="button" class="link-btn" data-compare-preset="mismatches">Show diffs only</button>
   · <button type="button" class="link-btn" data-compare-preset="all">Show all rows</button>

@@ -23,16 +23,33 @@ if not exist ".venv\Scripts\python.exe" (
   exit /b 1
 )
 
-echo [ps-tool-web] Stopping any process listening on %HOST%:%PORT% ...
-for /f "tokens=5" %%P in ('netstat -ano ^| findstr ":%PORT% " ^| findstr LISTENING') do (
-  taskkill /F /PID %%P >nul 2>&1
+set "PS_TOOL_CMD_PORT=%PORT%"
+echo [ps-tool-web] Checking port %PORT% ...
+powershell -NoProfile -ExecutionPolicy Bypass -Command ^
+  "$port = [int]$env:PS_TOOL_CMD_PORT;" ^
+  "$listeners = @(Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue ^| Select-Object -ExpandProperty OwningProcess -Unique);" ^
+  "foreach ($processId in $listeners) {" ^
+  "  $process = Get-CimInstance Win32_Process -Filter ('ProcessId = ' + $processId) -ErrorAction SilentlyContinue;" ^
+  "  $commandLine = [string]$process.CommandLine;" ^
+  "  if ($commandLine -match '(?i)uvicorn' -and $commandLine -match 'app\.main:app') {" ^
+  "    Write-Host ('[ps-tool-web] Restarting existing server process PID ' + $processId + ' ...');" ^
+  "    Stop-Process -Id $processId -Force -ErrorAction Stop;" ^
+  "  } else {" ^
+  "    Write-Error ('Port ' + $port + ' is already used by another process (PID ' + $processId + '). Refusing to terminate it.');" ^
+  "    exit 20;" ^
+  "  }" ^
+  "}"
+
+if errorlevel 1 (
+  echo ERROR: Cannot start ps-tool-web on port %PORT%.
+  exit /b 1
 )
 
-call ".venv\Scripts\activate.bat"
+set "PS_TOOL_CMD_PORT="
 
 echo [ps-tool-web] Starting server at http://%HOST%:%PORT%/
 echo Press Ctrl+C to stop.
-python -m uvicorn app.main:app %RELOAD% --host %HOST% --port %PORT%
+".venv\Scripts\python.exe" -m uvicorn app.main:app %RELOAD% --host %HOST% --port %PORT%
 
-endlocal
-exit /b %ERRORLEVEL%
+set "EXIT_CODE=%ERRORLEVEL%"
+endlocal & exit /b %EXIT_CODE%

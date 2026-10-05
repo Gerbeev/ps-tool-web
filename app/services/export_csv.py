@@ -5,9 +5,10 @@ from __future__ import annotations
 import csv
 import io
 from datetime import datetime
-from typing import Iterable
+from typing import Iterable, Iterator
 
 from app.models import ComparisonContext, ComparisonResult, JobPair, SnapshotJob, TopologySnapshot
+from app.services.topology_index import ensure_topology_indexes
 
 TOPOLOGY_COLUMNS = [
     "logical_id",
@@ -43,6 +44,7 @@ COMPARISON_COLUMNS = [
     "right_status",
     "diff_kind",
     "parameter_mismatches",
+    "not_comparable_parameters",
     "timing_delta_sec",
     "match_confidence",
 ]
@@ -79,7 +81,8 @@ def export_topology_csv(snapshot: TopologySnapshot) -> str:
 
 
 def iter_topology_rows(snapshot: TopologySnapshot):
-    by_uid = {j.job_uid: j for j in snapshot.flat_jobs}
+    ensure_topology_indexes(snapshot)
+    by_uid: dict[str, SnapshotJob] = snapshot.metadata.get("jobs_by_uid") or {}
     jobs = sorted(snapshot.flat_jobs, key=lambda j: "/".join(j.path_labels))
     ctx = snapshot.context
     for job in jobs:
@@ -113,17 +116,11 @@ def iter_topology_rows(snapshot: TopologySnapshot):
 
 
 def iter_topology_csv_lines(snapshot: TopologySnapshot):
-    buf = io.StringIO()
-    writer = csv.DictWriter(buf, fieldnames=TOPOLOGY_COLUMNS, extrasaction="ignore")
-    writer.writeheader()
-    yield buf.getvalue()
-    buf = io.StringIO()
-    writer = csv.DictWriter(buf, fieldnames=TOPOLOGY_COLUMNS, extrasaction="ignore")
-    for row in iter_topology_rows(snapshot):
-        writer.writerow(row)
-        yield buf.getvalue()
-        buf = io.StringIO()
-        writer = csv.DictWriter(buf, fieldnames=TOPOLOGY_COLUMNS, extrasaction="ignore")
+    yield from _iter_csv_lines(
+        iter_topology_rows(snapshot),
+        TOPOLOGY_COLUMNS,
+        extrasaction="ignore",
+    )
 
 
 def _timing_delta_pair(pair: JobPair) -> str:
@@ -134,17 +131,18 @@ def _timing_delta_pair(pair: JobPair) -> str:
     return ""
 
 
-def _diff_kind(pair: JobPair, result: ComparisonResult | None = None) -> str:
+def _diff_kind(
+    pair: JobPair,
+    *,
+    definition_mismatch_ids: set[str],
+    timing_mismatch_ids: set[str],
+) -> str:
     if pair.left and pair.right:
         if pair.left.status != pair.right.status:
             return "status_mismatch"
-        if result and any(
-            m.logical_id == pair.logical_id
-            for m in result.parameter_mismatches
-            if m.parameter not in ("actual_start", "actual_end")
-        ):
+        if pair.logical_id and pair.logical_id in definition_mismatch_ids:
             return "definition_mismatch"
-        if result and pair in result.timing_deltas:
+        if pair.logical_id and pair.logical_id in timing_mismatch_ids:
             return "timing_mismatch"
         return "ok"
     if pair.left:
@@ -152,16 +150,13 @@ def _diff_kind(pair: JobPair, result: ComparisonResult | None = None) -> str:
     return "right_only"
 
 
-def _parameter_mismatch_summary(pair: JobPair, result: ComparisonResult | None) -> str:
-    if not result or not pair.logical_id:
+def _parameter_mismatch_summary(
+    pair: JobPair,
+    parameter_names_by_id: dict[str, set[str]],
+) -> str:
+    if not pair.logical_id:
         return ""
-    names = sorted(
-        {
-            m.parameter
-            for m in result.parameter_mismatches
-            if m.logical_id == pair.logical_id
-        }
-    )
+    names = sorted(parameter_names_by_id.get(pair.logical_id, set()))
     return ";".join(names)
 
 
@@ -175,32 +170,82 @@ def export_comparison_csv(result: ComparisonResult) -> str:
 
 
 def iter_comparison_rows(result: ComparisonResult):
+    parameter_names_by_id: dict[str, set[str]] = {}
+    not_comparable_names_by_id: dict[str, set[str]] = {}
+    definition_mismatch_ids: set[str] = set()
+    for mismatch in result.parameter_mismatches:
+        if not mismatch.logical_id:
+            continue
+        parameter_names_by_id.setdefault(mismatch.logical_id, set()).add(mismatch.parameter)
+        if mismatch.parameter not in ("actual_start", "actual_end"):
+            definition_mismatch_ids.add(mismatch.logical_id)
+    for skipped in result.not_comparable:
+        if skipped.logical_id:
+            not_comparable_names_by_id.setdefault(skipped.logical_id, set()).add(skipped.parameter)
+
+    timing_mismatch_ids = {
+        pair.logical_id for pair in result.timing_deltas if pair.logical_id
+    }
+
     for pair in _comparison_row_pairs(result):
+        logical_id = pair.logical_id or ""
         yield {
-            "logical_id": pair.logical_id or "",
+            "logical_id": logical_id,
             "left_name": pair.left.scheduler_job_name if pair.left else "",
             "right_name": pair.right.scheduler_job_name if pair.right else "",
             "left_status": pair.left.status.value if pair.left else "",
             "right_status": pair.right.status.value if pair.right else "",
-            "diff_kind": _diff_kind(pair, result),
-            "parameter_mismatches": _parameter_mismatch_summary(pair, result),
+            "diff_kind": _diff_kind(
+                pair,
+                definition_mismatch_ids=definition_mismatch_ids,
+                timing_mismatch_ids=timing_mismatch_ids,
+            ),
+            "parameter_mismatches": _parameter_mismatch_summary(
+                pair, parameter_names_by_id
+            ),
+            "not_comparable_parameters": ";".join(
+                sorted(not_comparable_names_by_id.get(logical_id, set()))
+            ),
             "timing_delta_sec": _timing_delta_pair(pair),
             "match_confidence": pair.confidence.value,
         }
 
+    for conflict in result.identity_conflicts:
+        yield {
+            "logical_id": conflict.logical_id,
+            "left_name": ";".join(conflict.job_names) if conflict.side == "left" else "",
+            "right_name": ";".join(conflict.job_names) if conflict.side == "right" else "",
+            "left_status": "",
+            "right_status": "",
+            "diff_kind": "identity_conflict",
+            "parameter_mismatches": "",
+            "not_comparable_parameters": "identity",
+            "timing_delta_sec": "",
+            "match_confidence": "unmatched",
+        }
+
 
 def iter_comparison_csv_lines(result: ComparisonResult):
+    yield from _iter_csv_lines(iter_comparison_rows(result), COMPARISON_COLUMNS)
+
+
+def _iter_csv_lines(
+    rows: Iterable[dict[str, object]],
+    fieldnames: list[str],
+    *,
+    extrasaction: str = "raise",
+) -> Iterator[str]:
     buf = io.StringIO()
-    writer = csv.DictWriter(buf, fieldnames=COMPARISON_COLUMNS)
+    writer = csv.DictWriter(buf, fieldnames=fieldnames, extrasaction=extrasaction)
     writer.writeheader()
     yield buf.getvalue()
-    buf = io.StringIO()
-    writer = csv.DictWriter(buf, fieldnames=COMPARISON_COLUMNS)
-    for row in iter_comparison_rows(result):
+    buf.seek(0)
+    buf.truncate(0)
+    for row in rows:
         writer.writerow(row)
         yield buf.getvalue()
-        buf = io.StringIO()
-        writer = csv.DictWriter(buf, fieldnames=COMPARISON_COLUMNS)
+        buf.seek(0)
+        buf.truncate(0)
 
 
 def _comparison_row_pairs(result: ComparisonResult) -> Iterable[JobPair]:

@@ -7,7 +7,7 @@ from enum import Enum
 from typing import Any
 from uuid import uuid4
 
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app.autosys_reference import AutoSysJobReference
 
@@ -42,6 +42,26 @@ class MatchConfidence(str, Enum):
     UNMATCHED = "unmatched"
 
 
+class FieldSupport(str, Enum):
+    """How confidently an adapter can provide a comparison field."""
+
+    SUPPORTED = "supported"
+    UNSUPPORTED = "unsupported"
+    UNKNOWN = "unknown"
+    NOT_APPLICABLE = "not_applicable"
+
+
+class ComparisonOutcome(str, Enum):
+    MATCH = "match"
+    MISMATCH = "mismatch"
+    NOT_COMPARABLE = "not_comparable"
+
+
+class ValidationSeverity(str, Enum):
+    ERROR = "error"
+    WARNING = "warning"
+
+
 class AsOfKind(str, Enum):
     BUSINESS_DATE = "business_date"
     RUN_ID = "run_id"
@@ -59,15 +79,50 @@ class ContextFilters(BaseModel):
 
 
 class ComparisonContext(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     environment_id: str
-    host: str = ""
+    endpoint_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("endpoint_url", "host"),
+    )
     scheduler: SchedulerType
     as_of: AsOf = Field(default_factory=lambda: AsOf(kind=AsOfKind.BUSINESS_DATE, value=""))
     filters: ContextFilters = Field(default_factory=ContextFilters)
 
+    @property
+    def host(self) -> str:
+        """Backward-compatible alias; endpoint_url is the canonical field."""
+        return self.endpoint_url
+
+
+class FieldEvidence(BaseModel):
+    """Human-readable provenance for a normalized comparison field."""
+
+    source: str = ""
+    locator: str = ""
+    note: str = ""
+
+
+class AdapterCapabilities(BaseModel):
+    """Capabilities declared by an adapter implementation.
+
+    ``parameter_support`` is optional. Missing entries remain backward-compatible and
+    are treated as supported unless the job itself explicitly says otherwise.
+    """
+
+    topology: bool = True
+    dependencies: bool = True
+    runtime: bool = True
+    job_detail: bool = True
+    root_listing: bool = True
+    autosys_projection: bool = True
+    strict_parameter_support: bool = False
+    parameter_support: dict[str, FieldSupport] = Field(default_factory=dict)
+
 
 class SnapshotJob(BaseModel):
-    """Topology job: identity + run instance UI fields + AutoSys reference view."""
+    """Topology job: identity + runtime fields + AutoSys-equivalent reference view."""
 
     job_uid: str
     logical_id: str | None = None
@@ -84,6 +139,8 @@ class SnapshotJob(BaseModel):
     exit_code: int | None = None
     autosys: AutoSysJobReference = Field(default_factory=AutoSysJobReference)
     attributes: dict[str, Any] = Field(default_factory=dict)
+    comparison_support: dict[str, FieldSupport] = Field(default_factory=dict)
+    comparison_evidence: dict[str, FieldEvidence] = Field(default_factory=dict)
 
     @property
     def job_type(self) -> str:
@@ -138,6 +195,7 @@ class TopologySnapshot(BaseModel):
     roots: list[JobNode] = Field(default_factory=list)
     flat_jobs: list[SnapshotJob] = Field(default_factory=list)
     edges: list[DependencyEdge] = Field(default_factory=list)
+    capabilities: AdapterCapabilities = Field(default_factory=AdapterCapabilities)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -154,6 +212,50 @@ class ParameterMismatch(BaseModel):
     parameter: str
     left_value: str = ""
     right_value: str = ""
+    left_evidence: FieldEvidence | None = None
+    right_evidence: FieldEvidence | None = None
+
+
+class NotComparableParameter(BaseModel):
+    logical_id: str | None = None
+    parameter: str
+    left_value: str = ""
+    right_value: str = ""
+    left_support: FieldSupport = FieldSupport.UNKNOWN
+    right_support: FieldSupport = FieldSupport.UNKNOWN
+    reason: str = ""
+    left_evidence: FieldEvidence | None = None
+    right_evidence: FieldEvidence | None = None
+
+
+class IdentityConflict(BaseModel):
+    side: str
+    logical_id: str
+    job_uids: list[str] = Field(default_factory=list)
+    job_names: list[str] = Field(default_factory=list)
+
+
+class SnapshotValidationIssue(BaseModel):
+    severity: ValidationSeverity
+    code: str
+    message: str
+    job_uid: str | None = None
+
+
+class SnapshotValidationReport(BaseModel):
+    issues: list[SnapshotValidationIssue] = Field(default_factory=list)
+
+    @property
+    def is_valid(self) -> bool:
+        return not any(issue.severity == ValidationSeverity.ERROR for issue in self.issues)
+
+    @property
+    def error_count(self) -> int:
+        return sum(issue.severity == ValidationSeverity.ERROR for issue in self.issues)
+
+    @property
+    def warning_count(self) -> int:
+        return sum(issue.severity == ValidationSeverity.WARNING for issue in self.issues)
 
 
 class ComparisonSummary(BaseModel):
@@ -166,6 +268,9 @@ class ComparisonSummary(BaseModel):
     mismatched_timing: int = 0
     left_only_count: int = 0
     right_only_count: int = 0
+    not_comparable_parameters: int = 0
+    not_comparable_counts: dict[str, int] = Field(default_factory=dict)
+    identity_conflicts: int = 0
 
 
 class ComparisonResult(BaseModel):
@@ -178,6 +283,8 @@ class ComparisonResult(BaseModel):
     timing_deltas: list[JobPair] = Field(default_factory=list)
     definition_mismatches: list[JobPair] = Field(default_factory=list)
     parameter_mismatches: list[ParameterMismatch] = Field(default_factory=list)
+    not_comparable: list[NotComparableParameter] = Field(default_factory=list)
+    identity_conflicts: list[IdentityConflict] = Field(default_factory=list)
     summary: ComparisonSummary = Field(default_factory=ComparisonSummary)
 
 

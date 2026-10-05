@@ -48,16 +48,20 @@ def get_child_nodes(snapshot: TopologySnapshot, parent_uid: str) -> list[JobNode
     """Return shallow JobNode list (no nested children) for lazy tree expansion."""
     ensure_topology_indexes(snapshot)
     index = snapshot.metadata.get("children_index") or {}
-    by_uid: dict[str, SnapshotJob] = snapshot.metadata.get("jobs_by_uid") or {
-        j.job_uid: j for j in snapshot.flat_jobs
-    }
-    allowed = {j.job_uid for j in snapshot.flat_jobs}
+    by_uid: dict[str, SnapshotJob] = snapshot.metadata.get("jobs_by_uid") or {}
     child_uids = index.get(parent_uid, [])
     return [
         JobNode(job=by_uid[uid], children=[])
         for uid in child_uids
-        if uid in by_uid and uid in allowed
+        if uid in by_uid
     ]
+
+
+def get_job(snapshot: TopologySnapshot, job_uid: str) -> SnapshotJob | None:
+    """Return a job by UID using the snapshot index."""
+    ensure_topology_indexes(snapshot)
+    by_uid: dict[str, SnapshotJob] = snapshot.metadata.get("jobs_by_uid") or {}
+    return by_uid.get(job_uid)
 
 
 def lazy_roots(snapshot: TopologySnapshot) -> list[JobNode]:

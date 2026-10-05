@@ -1,8 +1,7 @@
 # AutoSys (CA Workload Automation) sample definitions — Risk Analytics daily box.
-# YAML mirrors JIL job attributes per Broadcom AE 24.2 JIL reference (insert_job, job_type,
-# machine, owner, permission, date_conditions, days_of_week, start_times, run_calendar,
-# condition, box_name, std_out_file, std_err_file, watch_file, alarm_if_fail, max_run_alarm,
-# n_retrys, send_notification, group, application). Global vars: $$name / $${name} (Global Variables).
+# YAML mirrors high-value JIL attributes used by AutoSys 12.x/24.x migration checks.
+# It intentionally avoids invalid combinations such as days_of_week + run_calendar or
+# start_times + start_mins. Global vars use $$name / $${name} syntax.
 # Status / resolved command lines reflect autorep-style run instance, not stored in JIL.
 scheduler: autosys
 jobs:
@@ -17,7 +16,6 @@ jobs:
       application: RISK_ANALYTICS
       date_conditions: y
       start_times: "06:00"
-      days_of_week: all
       run_calendar: every_day
       timezone: Europe/Zurich
       alarm_if_fail: 1
@@ -37,9 +35,10 @@ jobs:
       owner: risk_ops@zia-batch01
       permission: gx
       watch_file: "/data/incoming/RISK_$${BUSINESS_DATE}.done"
+      watch_interval: 30
+      watch_file_min_size: 0
       date_conditions: y
       start_mins: 1
-      days_of_week: all
       run_calendar: every_day
       std_out_file: /logs/autosys/RISK_FILE_WAIT_INCOMING.out
       alarm_if_fail: 1
@@ -64,10 +63,10 @@ jobs:
       owner: risk_ops@zia-batch01
       permission: gx
       command: "/opt/risk/bin/risk_etl.sh --business-date $${BUSINESS_DATE}"
+      success_codes: 0
       condition: s(RISK_FILE_WAIT_INCOMING)
       date_conditions: y
       start_times: "06:05"
-      days_of_week: all
       run_calendar: every_day
       std_out_file: /logs/autosys/RISK_DAILY_ETL.out
       std_err_file: /logs/autosys/RISK_DAILY_ETL.err
@@ -95,7 +94,6 @@ jobs:
       condition: s(RISK_DAILY_ETL)
       date_conditions: y
       start_times: "06:46"
-      days_of_week: all
       run_calendar: every_day
       std_out_file: /logs/autosys/RISK_DOTNET_CALC.out
       std_err_file: /logs/autosys/RISK_DOTNET_CALC.err
@@ -123,7 +121,6 @@ jobs:
       condition: s(RISK_DOTNET_CALC)
       date_conditions: y
       start_times: "06:50"
-      days_of_week: all
       run_calendar: every_day
       std_out_file: /logs/autosys/RISK_DAILY_RECON.out
       std_err_file: /logs/autosys/RISK_DAILY_RECON.err
@@ -153,7 +150,6 @@ jobs:
       date_conditions: y
       start_times: "06:56"
       days_of_week: mo,tu,we,th,fr
-      run_calendar: weekdays
       std_out_file: /logs/autosys/RISK_LEGACY_REPORT.out
       std_err_file: /logs/autosys/RISK_LEGACY_REPORT.err
       alarm_if_fail: 1

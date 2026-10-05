@@ -22,7 +22,7 @@ from app.context_helpers import (
 from app.models import SchedulerType
 from app.search.sqlite_fts import search_index
 from app.services.comparison import fetch_snapshot, job_status_css
-from app.services.topology_index import child_count, get_child_nodes, lazy_roots
+from app.services.topology_index import child_count, get_child_nodes, get_job, lazy_roots
 from app.session_store import BrowseSession, session_store
 
 router = APIRouter()
@@ -132,7 +132,7 @@ async def browse_job_detail(request: Request, uid: str, session_id: str):
     session = session_store.get_browse(session_id)
     if not session:
         return HTMLResponse("<p>Session expired. Load the environment again.</p>", status_code=404)
-    job = next((j for j in session.snapshot.flat_jobs if j.job_uid == uid), None)
+    job = get_job(session.snapshot, uid)
     if not job:
         return HTMLResponse("<p>Job not found.</p>", status_code=404)
     return templates.TemplateResponse(

@@ -18,7 +18,12 @@ from app.models import (
 )
 from app.services.comparison import compare_contexts
 from app.services.table_rows import iter_table_rows, page_table_rows
-from app.services.topology_index import build_children_index, ensure_topology_indexes, get_child_nodes
+from app.services.topology_index import (
+    build_children_index,
+    ensure_topology_indexes,
+    get_child_nodes,
+    get_job,
+)
 import app.services.comparison as cmp
 
 
@@ -102,6 +107,7 @@ def test_children_index_o1_lookup():
     assert len(index.get(box_uid, [])) >= 1
     children = get_child_nodes(snap, box_uid)
     assert children and children[0].job.parent_uid == box_uid
+    assert get_job(snap, children[0].job.job_uid) is children[0].job
 
 
 def test_large_compare_under_one_second(monkeypatch):

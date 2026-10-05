@@ -64,11 +64,55 @@ def test_compare_mock_context_resolved_command_parity_for_etl():
     assert etl == []
 
 
-def test_compare_mock_context_command_parameter_diff_for_etl():
+def test_compare_mock_context_command_parameter_parity_for_etl():
     result = compare_contexts(_default_left_context(), _default_right_context())
     etl_cmd = [
         m
         for m in result.parameter_mismatches
         if m.logical_id == "RISK_DAILY_ETL|RiskDaily.EtlJob" and m.parameter == "command"
     ]
-    assert len(etl_cmd) == 1
+    assert etl_cmd == []
+
+
+def test_autosys_semantic_normalization_avoids_false_differences():
+    left = SnapshotJob(
+        job_uid="l-semantic",
+        scheduler_job_name="A",
+        status=JobStatus.SUCCESS,
+        autosys=AutoSysJobReference(
+            jil=AutoSysJobDefinition(
+                job_type="C",
+                date_conditions="y",
+                condition="success(UPSTREAM) AND done(OTHER)",
+                start_times="06:10, 06:00",
+                success_codes="0",
+            )
+        ),
+    )
+    right = SnapshotJob(
+        job_uid="r-semantic",
+        scheduler_job_name="B",
+        status=JobStatus.SUCCESS,
+        autosys=AutoSysJobReference(
+            jil=AutoSysJobDefinition(
+                job_type="CMD",
+                date_conditions=1,
+                condition="s(UPSTREAM)&d(OTHER)",
+                start_times="06:00,06:10",
+            )
+        ),
+    )
+
+    mismatches = compare_job_parameters(left, right, "semantic")
+    params = {m.parameter for m in mismatches}
+    assert "job_type" not in params
+    assert "date_conditions" not in params
+    assert "condition" not in params
+    assert "start_times" not in params
+    assert "exit_code_policy" not in params
+
+
+def test_unknown_jil_attributes_are_preserved_for_configurable_future_comparison():
+    definition = AutoSysJobDefinition.from_mapping({"job_name": "A", "custom_attr": "value"})
+    assert definition.model_extra == {"custom_attr": "value"}
+    assert AutoSysJobReference(jil=definition).parameter_value("custom_attr") == "value"

@@ -57,12 +57,15 @@ async def settings_page(request: Request, saved: int = 0):
 @router.post("/api/settings/environments", response_class=RedirectResponse)
 async def save_environment_schedulers(request: Request):
     form = await request.form()
+    allow_endpoint_edit = get_settings().use_mock_adapters
     updated: list[EnvironmentEntry] = []
     for entry in load_environments():
         sched = form.get(f"scheduler_{entry.id}")
         if sched not in (SchedulerType.AUTOSYS.value, SchedulerType.PROCESS_SCHEDULER.value):
             sched = resolve_scheduler(entry).value
-        host = (form.get(f"host_{entry.id}") or "").strip()
+        endpoint_url = entry.endpoint_url
+        if allow_endpoint_edit:
+            endpoint_url = (form.get(f"endpoint_url_{entry.id}") or "").strip()
         updated.append(
             EnvironmentEntry(
                 id=entry.id,
@@ -70,7 +73,7 @@ async def save_environment_schedulers(request: Request):
                 region=entry.region,
                 connector_profile=entry.connector_profile,
                 scheduler=sched,
-                host=host,
+                endpoint_url=endpoint_url,
             )
         )
     save_environments(updated)

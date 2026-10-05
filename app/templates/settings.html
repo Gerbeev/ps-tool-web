@@ -14,12 +14,12 @@
       {% if saved %}
       <p class="box-saved" role="status">Environment settings saved.</p>
       {% endif %}
-      <p class="muted box-lead">Host and scheduler type per environment. Browse and Compare use these values automatically.</p>
+      <p class="muted box-lead">Endpoint URL and scheduler type per environment. Browse and Compare use these values automatically.</p>
     </div>
 
     <div class="box__section box__pad">
       <h2>Environments</h2>
-      <p class="small muted box-note">Saved to <code>{{ config_dir }}/environments.yaml</code></p>
+      <p class="small muted box-note">Saved to <code>{{ config_dir }}/environments.yaml</code>. {% if not use_mock_adapters %}Endpoint URLs are read-only in real-adapter mode to prevent runtime endpoint redirection/SSRF; change them through controlled deployment configuration.{% endif %}</p>
       <form method="post" action="/api/settings/environments">
         <div class="table-scroll" tabindex="0" role="region" aria-label="Environment settings table">
         <table class="box-data-table">
@@ -27,7 +27,7 @@
             <tr>
               <th>Environment</th>
               <th>ID</th>
-              <th>Host</th>
+              <th>Endpoint</th>
               <th>Scheduler</th>
             </tr>
           </thead>
@@ -38,12 +38,13 @@
               <td><code>{{ env.id }}</code></td>
               <td>
                 <input type="text"
-                       name="host_{{ env.id }}"
+                       name="endpoint_url_{{ env.id }}"
                        class="app-control"
-                       value="{{ env.host or '' }}"
-                       placeholder="hostname or URL"
+                       value="{{ env.endpoint_url or '' }}"
+                       placeholder="https://scheduler-api.internal/..."
                        required
-                       aria-label="Host for {{ env.display_name }}">
+                       {% if not use_mock_adapters %}readonly{% endif %}
+                       aria-label="Endpoint URL for {{ env.display_name }}">
               </td>
               <td>
                 <select name="scheduler_{{ env.id }}" class="app-control" aria-label="Scheduler for {{ env.display_name }}">
@@ -67,7 +68,7 @@
       <h2>Adapters</h2>
       <p>
         <code>USE_MOCK_ADAPTERS</code> is currently
-        <strong>{% if use_mock_adapters %}enabled (mock){% else %}disabled (real — not implemented){% endif %}</strong>.
+        <strong>{% if use_mock_adapters %}enabled (mock){% else %}disabled (real endpoint adapters){% endif %}</strong>.
       </p>
       <p class="small muted box-note">Set in <code>.env</code> and restart the app.</p>
     </div>

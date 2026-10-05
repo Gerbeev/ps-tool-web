@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import yaml
-from pydantic import BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field
 
 
 def _repo_root() -> Path:
@@ -21,8 +21,16 @@ class EnvironmentEntry(BaseModel):
     connector_profile: str | None = None
     """autosys | process_scheduler — default scheduler when this env is selected."""
     scheduler: str | None = None
-    """Scheduler API / agent host (hostname or URL) for this environment."""
-    host: str = ""
+    """Base URL of the bank-internal scheduler endpoint used by this adapter."""
+    endpoint_url: str = Field(
+        default="",
+        validation_alias=AliasChoices("endpoint_url", "host"),
+    )
+
+    @property
+    def host(self) -> str:
+        """Backward-compatible alias; endpoint_url is the canonical field."""
+        return self.endpoint_url
 
 
 class IdentityPair(BaseModel):
@@ -98,9 +106,14 @@ def get_environment(environment_id: str) -> EnvironmentEntry | None:
     return None
 
 
-def host_for_environment(environment_id: str) -> str:
+def endpoint_for_environment(environment_id: str) -> str:
     entry = get_environment(environment_id)
-    return (entry.host or "").strip() if entry else ""
+    return (entry.endpoint_url or "").strip() if entry else ""
+
+
+def host_for_environment(environment_id: str) -> str:
+    """Backward-compatible alias for older callers/configuration."""
+    return endpoint_for_environment(environment_id)
 
 
 def scheduler_for_environment(environment_id: str):
@@ -132,7 +145,7 @@ def save_environments(entries: list[EnvironmentEntry]) -> None:
             for entry in entries
         ]
     }
-    header = "# Environment definitions — host & scheduler editable in Settings UI\n"
+    header = "# Environment definitions — endpoint & scheduler editable in Settings UI\n"
     with path.open("w", encoding="utf-8") as f:
         f.write(header)
         yaml.safe_dump(payload, f, sort_keys=False, allow_unicode=True, default_flow_style=False)

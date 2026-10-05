@@ -47,3 +47,23 @@ def test_compare_populates_parameter_mismatches():
     assert result.summary.mismatched_parameters >= 1
     assert len(result.parameter_mismatches) >= 1
     assert len(result.definition_mismatches) >= 1
+
+
+def test_regex_identity_rule_pairs_with_target_scheduler_name():
+    from app.models import SnapshotJob
+    from app.services.identity import logical_id_for_job
+
+    autosys_job = SnapshotJob(
+        job_uid="a-regex",
+        scheduler_job_name="RISK_FOO_AUTOSYS",
+        status=JobStatus.SUCCESS,
+    )
+    ps_job = SnapshotJob(
+        job_uid="p-regex",
+        scheduler_job_name="RiskDaily.FOO",
+        status=JobStatus.SUCCESS,
+    )
+
+    left_id, _ = logical_id_for_job(autosys_job, SchedulerType.AUTOSYS)
+    right_id, _ = logical_id_for_job(ps_job, SchedulerType.PROCESS_SCHEDULER)
+    assert left_id == right_id == "RiskDaily.FOO"

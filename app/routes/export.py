@@ -3,8 +3,10 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, HTTPException, Query
-from fastapi.responses import Response, StreamingResponse
+from fastapi.responses import StreamingResponse
 
+from app.config import endpoint_for_environment
+from app.context_helpers import default_business_date
 from app.models import AsOf, AsOfKind, ComparisonContext, SchedulerType
 from app.services.comparison import fetch_snapshot
 from app.services.export_csv import (
@@ -19,8 +21,9 @@ router = APIRouter()
 def _ctx(env: str, sched: str, as_of: str) -> ComparisonContext:
     return ComparisonContext(
         environment_id=env,
+        endpoint_url=endpoint_for_environment(env),
         scheduler=SchedulerType(sched),
-        as_of=AsOf(kind=AsOfKind.BUSINESS_DATE, value=as_of),
+        as_of=AsOf(kind=AsOfKind.BUSINESS_DATE, value=as_of or default_business_date()),
     )
 
 
@@ -29,10 +32,10 @@ async def export_left(
     session_id: str | None = None,
     environment_id: str | None = Query(None),
     scheduler: str | None = Query(None),
-    as_of: str = Query("2026-10-02"),
+    as_of: str = Query(""),
 ):
     snap = _snapshot_for_export(session_id, "left", environment_id, scheduler, as_of)
-    fname = f"topology_export_left_{snap.context.environment_id}_{as_of}.csv"
+    fname = f"topology_export_left_{snap.context.environment_id}_{snap.context.as_of.value}.csv"
     return StreamingResponse(
         iter_topology_csv_lines(snap),
         media_type="text/csv; charset=utf-8",
@@ -45,10 +48,10 @@ async def export_right(
     session_id: str | None = None,
     environment_id: str | None = Query(None),
     scheduler: str | None = Query(None),
-    as_of: str = Query("2026-10-02"),
+    as_of: str = Query(""),
 ):
     snap = _snapshot_for_export(session_id, "right", environment_id, scheduler, as_of)
-    fname = f"topology_export_right_{snap.context.environment_id}_{as_of}.csv"
+    fname = f"topology_export_right_{snap.context.environment_id}_{snap.context.as_of.value}.csv"
     return StreamingResponse(
         iter_topology_csv_lines(snap),
         media_type="text/csv; charset=utf-8",

@@ -1,4 +1,4 @@
-"""Mock Process Scheduler adapter for Phase 2 demos."""
+"""Mock Process Scheduler adapter for local development and contract tests."""
 
 from __future__ import annotations
 

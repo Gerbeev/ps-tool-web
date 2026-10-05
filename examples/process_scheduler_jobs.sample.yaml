@@ -19,7 +19,6 @@ jobs:
         application: RISK_ANALYTICS
         date_conditions: y
         start_times: "06:00"
-        days_of_week: all
         run_calendar: every_day
         timezone: Europe/Zurich
         alarm_if_fail: 1
@@ -51,11 +50,10 @@ jobs:
         machine: zia-batch01
         owner: risk_ops@zia-batch01
         permission: gx
-        command: "/opt/risk/bin/risk_etl.sh --business-date {BusinessDate}"
+        command: "/opt/risk/bin/risk_etl.sh --business-date $${BUSINESS_DATE}"
         condition: s(RISK_FILE_WAIT_INCOMING)
         date_conditions: y
         start_times: "06:05"
-        days_of_week: all
         run_calendar: every_day
         std_out_file: /logs/autosys/RISK_DAILY_ETL.out
         std_err_file: /logs/autosys/RISK_DAILY_ETL.err
@@ -91,9 +89,10 @@ jobs:
         owner: risk_ops@zia-batch01
         permission: gx
         watch_file: "/data/incoming/RISK_$${BUSINESS_DATE}.done"
+        watch_interval: 30
+        watch_file_min_size: 0
         date_conditions: y
         start_mins: 1
-        days_of_week: all
         run_calendar: every_day
         std_out_file: /logs/autosys/RISK_FILE_WAIT_INCOMING.out
         alarm_if_fail: 1
@@ -133,7 +132,6 @@ jobs:
         condition: s(RISK_DAILY_ETL)
         date_conditions: y
         start_times: "06:46"
-        days_of_week: all
         run_calendar: every_day
         std_out_file: /logs/autosys/RISK_DOTNET_CALC.out
         std_err_file: /logs/autosys/RISK_DOTNET_CALC.err
@@ -175,13 +173,12 @@ jobs:
         condition: s(RISK_DOTNET_CALC)
         date_conditions: y
         start_times: "06:50"
-        days_of_week: all
         run_calendar: every_day
         std_out_file: /logs/autosys/RISK_DAILY_RECON.out
         std_err_file: /logs/autosys/RISK_DAILY_RECON.err
         alarm_if_fail: 1
         max_run_alarm: 45
-        n_retrys: 0
+        n_retrys: 1
         send_notification: Y
         group: RISK
         application: RISK_ANALYTICS
@@ -211,7 +208,6 @@ jobs:
         condition: s(RISK_DAILY_RECON)
         date_conditions: y
         start_times: "07:00"
-        days_of_week: all
         run_calendar: every_day
       run:
         status: PENDING
