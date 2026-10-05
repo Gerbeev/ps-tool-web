@@ -1,13 +1,13 @@
 <div class="split-pane">
-  <div class="browse-box browse-box--inset">
-    <div class="browse-box__pad">
+  <div class="box box--inset">
+    <div class="box__pad">
       {% with snapshot=left_snapshot, side='left', roots=left_roots, session_id=session_id, mismatch_ids=mismatch_ids, tree_api_base='/api/tree/left', job_api_base='/api/job/left' %}
       {% include "partials/tree_side.html" %}
       {% endwith %}
     </div>
   </div>
-  <div class="browse-box browse-box--inset">
-    <div class="browse-box__pad">
+  <div class="box box--inset">
+    <div class="box__pad">
       {% with snapshot=right_snapshot, side='right', roots=right_roots, session_id=session_id, mismatch_ids=mismatch_ids, tree_api_base='/api/tree/right', job_api_base='/api/job/right' %}
       {% include "partials/tree_side.html" %}
       {% endwith %}

@@ -1,8 +1,8 @@
-<div class="browse-box__section browse-box__pad">
+<div class="box__section box__pad">
   {% include "partials/summary.html" %}
 </div>
 
-<div class="browse-box__section browse-box__pad export-row">
+<div class="box__section box__pad export-row">
   <a role="button" class="outline"
      href="/api/export/left.csv?session_id={{ session_id }}">Export Left CSV</a>
   <a role="button" class="outline"
@@ -12,7 +12,7 @@
   <input type="hidden" id="session-id" name="session_id" value="{{ session_id }}">
 </div>
 
-<div class="browse-box__section">
+<div class="box__section">
   <details class="box-disclosure">
     <summary class="box-disclosure__summary">Trees</summary>
     <div class="box-disclosure__body">
@@ -27,13 +27,23 @@
   </details>
   <details class="box-disclosure" open>
     <summary class="box-disclosure__summary">Table</summary>
-    <div class="box-disclosure__body">
-      <div id="compare-table-panel"
-           hx-get="/api/compare/table?session_id={{ session_id }}&filter={{ table_filter|default('all') }}&limit={{ table_limit|default(0) }}"
-           hx-trigger="load"
-           hx-target="this"
-           hx-swap="innerHTML">
-        <p class="muted small">Loading table…</p>
+    <div class="box-disclosure__body compare-table-pane">
+      <div class="box box--inset compare-table-filters-panel">
+        <div class="box__pad" role="search" aria-label="Filter comparison table">
+          {% include "partials/compare_table_filters.html" %}
+        </div>
+      </div>
+      <div class="box box--inset compare-table-list">
+        <div class="box__pad">
+          <div id="compare-table-panel"
+               class="compare-table-data"
+               hx-get="/api/compare/table?session_id={{ session_id }}&filter=all&limit=0"
+               hx-trigger="load"
+               hx-target="this"
+               hx-swap="innerHTML">
+            <p class="muted small">Loading table…</p>
+          </div>
+        </div>
       </div>
     </div>
   </details>
@@ -41,12 +51,16 @@
 
 <section id="job-detail-panel" class="job-detail-panel browse-detail-panel" aria-live="polite"></section>
 
+<script src="/static/js/compare-table-filters.js"></script>
 <script>
   (function () {
     var search = document.getElementById('global-search');
     if (search) {
       search.disabled = false;
       search.placeholder = 'Search jobs in this compare… (Ctrl+K)';
+    }
+    if (window.psCompareTableFiltersInit) {
+      window.psCompareTableFiltersInit();
     }
   })();
 </script>

@@ -1,56 +1,55 @@
-{% extends "base.html" %}
-{% set active_nav = 'browse' %}
-{% block title %}Select environment — ps-tool-web{% endblock %}
-{% block content %}
-<section class="browse-page box-page">
-  <div id="browse-env-panel" class="browse-env-panel browse-box">
-    <div class="browse-env-panel-header browse-box__section browse-box__pad">
-      <button type="button"
-              id="browse-env-toggle"
-              class="browse-env-toggle"
-              aria-expanded="true"
-              aria-controls="browse-env-panel-body"
-              aria-label="Collapse context panel">
-        <span class="browse-env-chevron" aria-hidden="true"></span>
-      </button>
-      <div class="browse-env-panel-heading">
-        <h1>Select environment</h1>
-        <p id="browse-env-summary" class="browse-env-summary muted"></p>
-      </div>
-      <div class="browse-env-panel-actions">
-        <button type="submit" form="browse-form">Load tree</button>
-        <span id="browse-spinner-header" class="htmx-indicator" aria-live="polite">Loading…</span>
-      </div>
-    </div>
-    <div id="browse-env-panel-body" class="browse-env-panel-body browse-box__section browse-box__pad">
-      <form id="browse-form"
-            class="browse-env-form"
-            hx-post="/api/browse/load"
-            hx-target="#browse-output"
-            hx-indicator="#browse-spinner-header">
-        <label class="browse-field-stack">
-          <span class="browse-field-label">Environment</span>
-          <select name="environment_id" id="browse-env"
-                  hx-get="/api/browse/form"
-                  hx-trigger="change"
-                  hx-target="#browse-context-fields"
-                  hx-include="#browse-env, #browse-as-of, #browse-topology, #browse-scheduler">
-            {% for env in environments %}
-            <option value="{{ env.id }}" {% if env.id == environment_id %}selected{% endif %}>{{ env.display_name }}</option>
-            {% endfor %}
-          </select>
-        </label>
-        <div id="browse-context-fields">
-          {% include "partials/browse_form_fields.html" %}
-        </div>
-      </form>
-    </div>
-  </div>
-
-  <div id="browse-output" class="browse-output browse-box">
-    <p class="browse-box__pad muted browse-output-placeholder">Select context and click Load tree.</p>
-  </div>
-</section>
-<script src="/static/js/browse-env-panel.js"></script>
-{% endblock %}
-
+{% extends "base.html" %}
+{% set active_nav = 'browse' %}
+{% block title %}Select environment — ps-tool-web{% endblock %}
+{% block content %}
+<section class="box-page">
+  <div id="browse-env-panel" class="browse-env-panel box">
+    <div class="browse-env-panel-header box__section box__pad">
+      <button type="button"
+              id="browse-env-toggle"
+              class="browse-env-toggle"
+              aria-expanded="true"
+              aria-controls="browse-env-panel-body"
+              aria-label="Collapse context panel">
+        <span class="browse-env-chevron" aria-hidden="true"></span>
+      </button>
+      <div class="browse-env-panel-heading">
+        <h1>Select environment</h1>
+        <p id="browse-env-summary" class="browse-env-summary muted"></p>
+      </div>
+      <div class="browse-env-panel-actions">
+        <button type="submit" form="browse-form">Load tree</button>
+        <span id="browse-spinner-header" class="htmx-indicator" aria-live="polite">Loading…</span>
+      </div>
+    </div>
+    <div id="browse-env-panel-body" class="browse-env-panel-body box__section box__pad">
+      <form id="browse-form"
+            class="browse-env-form"
+            hx-post="/api/browse/load"
+            hx-target="#browse-output"
+            hx-indicator="#browse-spinner-header">
+        <label class="box-field-stack">
+          <span class="box-field-label">Environment</span>
+          <select name="environment_id" id="browse-env" class="app-control"
+                  hx-get="/api/browse/form"
+                  hx-trigger="change"
+                  hx-target="#browse-context-fields"
+                  hx-include="#browse-env, #browse-as-of, #browse-topology, #browse-scheduler">
+            {% for env in environments %}
+            <option value="{{ env.id }}" {% if env.id == environment_id %}selected{% endif %}>{{ env.display_name }}</option>
+            {% endfor %}
+          </select>
+        </label>
+        <div id="browse-context-fields">
+          {% include "partials/browse_form_fields.html" %}
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="browse-output" class="box box-output">
+    <p class="box__pad muted box-output-placeholder">Select context and click Load tree.</p>
+  </div>
+</section>
+<script src="/static/js/browse-env-panel.js"></script>
+{% endblock %}

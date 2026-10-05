@@ -1,41 +1,4 @@
-<div class="table-toolbar">
-  <form class="table-filters"
-        hx-get="/api/compare/table"
-        hx-target="#compare-table-panel"
-        hx-swap="innerHTML">
-    <input type="hidden" name="session_id" value="{{ session_id }}">
-    <label class="browse-field-stack">
-      <span class="browse-field-label">Filter</span>
-      <select name="filter" class="app-control">
-        <option value="all" {% if filter == 'all' %}selected{% endif %}>All rows</option>
-        <option value="mismatches" {% if filter == 'mismatches' %}selected{% endif %}>Diffs only</option>
-        <option value="matched" {% if filter == 'matched' %}selected{% endif %}>Paired (both sides)</option>
-        <option value="status_delta" {% if filter == 'status_delta' %}selected{% endif %}>Status Δ</option>
-        <option value="left_only" {% if filter == 'left_only' %}selected{% endif %}>Left only</option>
-        <option value="right_only" {% if filter == 'right_only' %}selected{% endif %}>Right only</option>
-      </select>
-    </label>
-    <label class="browse-field-stack">
-      <span class="browse-field-label">Name prefix</span>
-      <input type="text" name="q_prefix" class="app-control" value="{{ q_prefix or '' }}" placeholder="RISK_">
-    </label>
-    <label class="browse-field-stack">
-      <span class="browse-field-label">Page size</span>
-      <select name="limit" class="app-control">
-        <option value="0" {% if not limit %}selected{% endif %}>All (default)</option>
-        <option value="50" {% if limit == 50 %}selected{% endif %}>50</option>
-        <option value="100" {% if limit == 100 %}selected{% endif %}>100</option>
-        <option value="250" {% if limit == 250 %}selected{% endif %}>250</option>
-      </select>
-    </label>
-    <input type="hidden" name="offset" value="0">
-    <button type="submit">Apply</button>
-  </form>
-  <p class="muted small table-meta">
-    Showing {% if limit and limit > 0 %}{{ rows|length }} of {{ total }}{% else %}{{ total }}{% endif %} rows
-    {% if filter != 'all' %} · filter <code>{{ filter }}</code>{% endif %}
-  </p>
-</div>
+<p id="compare-table-meta" class="muted small compare-table-meta" aria-live="polite"></p>
 
 <table role="grid" class="compare-table">
   <thead>
@@ -50,16 +13,31 @@
       <th>Confidence</th>
     </tr>
   </thead>
-  <tbody>
+  <tbody id="compare-table-body">
     {% if not rows %}
-    <tr><td colspan="8" class="muted">No rows for this filter.</td></tr>
+    <tr><td colspan="8" class="muted">No rows in comparison.</td></tr>
     {% endif %}
     {% for row in rows %}
     {% if row.kind == 'pair' and row.pair %}
     {% set pair = row.pair %}
     {% set param_delta = param_mismatches_by_id.get(pair.logical_id or '', []) if param_mismatches_by_id else [] %}
-    <tr class="{% if pair.left and pair.right and (pair.left.status != pair.right.status or param_delta) %}row-mismatch{% endif %}">
-      <td>{% if pair.left and pair.right and pair.left.status == pair.right.status and not param_delta %}ok{% else %}Δ{% endif %}</td>
+    {% set status_match = pair.left and pair.right and pair.left.status == pair.right.status %}
+    {% set search_blob = ((pair.logical_id or '') ~ ' ' ~ (pair.left.scheduler_job_name if pair.left else '') ~ ' ' ~ (pair.right.scheduler_job_name if pair.right else '')) | lower %}
+    {% if status_match and not param_delta %}
+      {% set compare_tags = 'pair matched' %}
+    {% else %}
+      {% set compare_tags = 'pair mismatch' %}
+      {% if pair.left and pair.right and pair.left.status != pair.right.status %}
+        {% set compare_tags = compare_tags ~ ' status_delta' %}
+      {% endif %}
+      {% if param_delta %}
+        {% set compare_tags = compare_tags ~ ' param_delta' %}
+      {% endif %}
+    {% endif %}
+    <tr class="{% if not status_match or param_delta %}row-mismatch{% endif %}"
+        data-compare-search="{{ search_blob }}"
+        data-compare-tags="{{ compare_tags }}">
+      <td>{% if status_match and not param_delta %}ok{% else %}Δ{% endif %}</td>
       <td><code>{{ pair.logical_id or '—' }}</code></td>
       <td>{{ pair.left.scheduler_job_name if pair.left else '—' }}</td>
       <td><span class="{{ job_status_css(pair.left.status) if pair.left else '' }}">{{ pair.left.status.value if pair.left else '—' }}</span></td>
@@ -69,7 +47,10 @@
       <td>{{ pair.confidence.value }}</td>
     </tr>
     {% elif row.kind == 'left_only' and row.job %}
-    <tr class="row-left-only">
+    {% set search_blob = ((row.logical_id or '') ~ ' ' ~ row.job.scheduler_job_name) | lower %}
+    <tr class="row-left-only"
+        data-compare-search="{{ search_blob }}"
+        data-compare-tags="left_only mismatch">
       <td>left only</td>
       <td><code>{{ row.logical_id or row.job.scheduler_job_name }}</code></td>
       <td>{{ row.job.scheduler_job_name }}</td>
@@ -80,7 +61,10 @@
       <td>{{ row.job.logical_id and 'mapped' or 'name_only' }}</td>
     </tr>
     {% elif row.kind == 'right_only' and row.job %}
-    <tr class="row-right-only">
+    {% set search_blob = ((row.logical_id or '') ~ ' ' ~ row.job.scheduler_job_name) | lower %}
+    <tr class="row-right-only"
+        data-compare-search="{{ search_blob }}"
+        data-compare-tags="right_only mismatch">
       <td>right only</td>
       <td><code>{{ row.logical_id or row.job.scheduler_job_name }}</code></td>
       <td>—</td>
@@ -94,21 +78,3 @@
     {% endfor %}
   </tbody>
 </table>
-
-{% if limit and limit > 0 and total > limit %}
-<nav class="table-pager" aria-label="Table pages">
-  {% if offset > 0 %}
-  {% set prev_offset = offset - limit %}
-  <button type="button"
-          hx-get="/api/compare/table?session_id={{ session_id }}&filter={{ filter }}&limit={{ limit }}&offset={{ prev_offset if prev_offset > 0 else 0 }}&q_prefix={{ q_prefix or '' }}"
-          hx-target="#compare-table-panel"
-          hx-swap="innerHTML">Previous</button>
-  {% endif %}
-  {% if offset + limit < total %}
-  <button type="button"
-          hx-get="/api/compare/table?session_id={{ session_id }}&filter={{ filter }}&limit={{ limit }}&offset={{ offset + limit }}&q_prefix={{ q_prefix or '' }}"
-          hx-target="#compare-table-panel"
-          hx-swap="innerHTML">Next</button>
-  {% endif %}
-</nav>
-{% endif %}

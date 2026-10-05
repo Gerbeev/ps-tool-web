@@ -1,8 +1,8 @@
 <input type="hidden" name="{{ side }}_scheduler" id="compare-{{ side }}-scheduler" value="{{ scheduler }}">
-<p class="small muted compare-scheduler-note">{{ scheduler_label }}</p>
+<p class="small muted box-note">{{ scheduler_label }}</p>
 {% if scheduler == 'process_scheduler' %}
-<label class="browse-field-stack">
-  <span class="browse-field-label">Topology</span>
+<label class="box-field-stack">
+  <span class="box-field-label">Topology</span>
   <select name="{{ side }}_topology" id="compare-{{ side }}-topology" class="app-control">
     {% for t in topologies %}
     <option value="{{ t }}" {% if t == topology %}selected{% endif %}>{{ t }}</option>
@@ -14,8 +14,8 @@
 </label>
 <input type="hidden" name="{{ side }}_as_of" value="{{ as_of }}">
 {% else %}
-<label class="browse-field-stack">
-  <span class="browse-field-label">Business date</span>
+<label class="box-field-stack">
+  <span class="box-field-label">Business date</span>
   <input type="date"
          name="{{ side }}_as_of"
          id="compare-{{ side }}-as-of"

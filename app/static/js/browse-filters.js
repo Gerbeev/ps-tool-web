@@ -262,7 +262,7 @@
     if (!anyVisible) {
       if (!empty) {
         empty = document.createElement('p');
-        empty.className = 'browse-filter-empty browse-box__pad muted';
+        empty.className = 'browse-filter-empty box__pad muted';
         empty.textContent = 'No jobs match the current filters.';
         body.appendChild(empty);
       }

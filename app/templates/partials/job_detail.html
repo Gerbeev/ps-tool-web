@@ -1,21 +1,24 @@
-<article class="job-detail-card{% if panel_mode == 'browse' %} job-detail-card--browse{% endif %}">
+<div class="job-detail-card">
   {% if panel_mode == 'browse' %}
-  <header class="job-detail-card-header">
+  <div class="box__section box__pad box-section-head job-detail-card-header">
     <div>
-      <p class="job-detail-kicker">Job details</p>
+      <p class="box-field-label">Job details</p>
       <h3>{{ job.scheduler_job_name }}</h3>
     </div>
     <button type="button"
             class="icon-btn job-detail-close"
             aria-label="Close job details"
             onclick="window.psBrowseClosePanel && window.psBrowseClosePanel();">×</button>
-  </header>
+  </div>
   {% else %}
-  <header>{{ side|upper }} · {{ job.scheduler_job_name }}</header>
+  <div class="box__section box__pad box-section-head">
+    <p class="box-field-label">{{ side|upper }}</p>
+    <h3>{{ job.scheduler_job_name }}</h3>
+  </div>
   {% endif %}
 
-  <section class="job-detail-section">
-    <h4>Identity &amp; run</h4>
+  <div class="box__section box__pad">
+    <p class="box-field-label">Identity &amp; run</p>
     <dl class="job-detail-dl">
       <dt>Status</dt><dd class="{{ job_status_css(job.status) }}">{{ job.status.value }} ({{ job.status_raw }})</dd>
       <dt>job_uid</dt><dd><code>{{ job.job_uid }}</code></dd>
@@ -30,20 +33,20 @@
       <dt>Duration (s)</dt><dd>{{ job.duration_sec if job.duration_sec is not none else '—' }}</dd>
       <dt>Exit code</dt><dd>{{ job.exit_code if job.exit_code is not none else '—' }}</dd>
     </dl>
-  </section>
+  </div>
 
-  <section class="job-detail-section">
-    <h4>JIL definition</h4>
+  <div class="box__section box__pad">
+    <p class="box-field-label">JIL definition</p>
     <dl class="job-detail-dl">
       {% for key, value in job.autosys.jil.model_dump().items() %}
       <dt>{{ key }}</dt>
       <dd>{% if value is none or value == '' %}—{% elif key in ['command', 'watch_file', 'condition', 'std_out_file', 'std_err_file', 'start_times'] %}<code>{{ value }}</code>{% else %}{{ value }}{% endif %}</dd>
       {% endfor %}
     </dl>
-  </section>
+  </div>
 
-  <section class="job-detail-section">
-    <h4>Run instance</h4>
+  <div class="box__section box__pad">
+    <p class="box-field-label">Run instance</p>
     <dl class="job-detail-dl">
       {% for key, value in job.autosys.run.model_dump().items() %}
       <dt>{{ key }}</dt>
@@ -60,16 +63,16 @@
       </dd>
       {% endfor %}
     </dl>
-  </section>
+  </div>
 
   {% if job.attributes %}
-  <section class="job-detail-section">
-    <h4>Adapter attributes</h4>
+  <div class="box__section box__pad">
+    <p class="box-field-label">Adapter attributes</p>
     <dl class="job-detail-dl">
       {% for key, value in job.attributes.items() %}
       <dt>{{ key }}</dt><dd><code>{{ value }}</code></dd>
       {% endfor %}
     </dl>
-  </section>
+  </div>
   {% endif %}
-</article>
+</div>

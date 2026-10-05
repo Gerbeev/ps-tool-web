@@ -2,21 +2,21 @@
 {% set active_nav = 'settings' %}
 {% block title %}Settings — ps-tool-web{% endblock %}
 {% block content %}
-<section class="box-page settings-page">
-  <div class="browse-box">
-    <div class="browse-box__section browse-box__pad">
+<section class="box-page">
+  <div class="box">
+    <div class="box__section box__pad">
       <h1>Settings</h1>
       {% if saved %}
-      <p class="settings-saved" role="status">Environment settings saved.</p>
+      <p class="box-saved" role="status">Environment settings saved.</p>
       {% endif %}
-      <p class="muted">Host and scheduler type per environment. Browse and Compare use these values automatically.</p>
+      <p class="muted box-lead">Host and scheduler type per environment. Browse and Compare use these values automatically.</p>
     </div>
 
-    <div class="browse-box__section browse-box__pad">
+    <div class="box__section box__pad">
       <h2>Environments</h2>
-      <p class="small muted">Saved to <code>{{ config_dir }}/environments.yaml</code></p>
-      <form method="post" action="/api/settings/environments" class="settings-env-form">
-        <table class="settings-env-table" role="grid">
+      <p class="small muted box-note">Saved to <code>{{ config_dir }}/environments.yaml</code></p>
+      <form method="post" action="/api/settings/environments">
+        <table class="box-data-table" role="grid">
           <thead>
             <tr>
               <th>Environment</th>
@@ -33,14 +33,14 @@
               <td>
                 <input type="text"
                        name="host_{{ env.id }}"
-                       class="app-control settings-env-host"
+                       class="app-control"
                        value="{{ env.host or '' }}"
                        placeholder="hostname or URL"
                        required
                        aria-label="Host for {{ env.display_name }}">
               </td>
               <td>
-                <select name="scheduler_{{ env.id }}" class="app-control settings-env-select" aria-label="Scheduler for {{ env.display_name }}">
+                <select name="scheduler_{{ env.id }}" class="app-control" aria-label="Scheduler for {{ env.display_name }}">
                   {% for value, label in scheduler_choices %}
                   <option value="{{ value }}" {% if resolved_schedulers[env.id] == value %}selected{% endif %}>{{ label }}</option>
                   {% endfor %}
@@ -50,28 +50,34 @@
             {% endfor %}
           </tbody>
         </table>
-        <button type="submit">Save environments</button>
+        <div class="box-form-actions">
+          <button type="submit">Save environments</button>
+        </div>
       </form>
     </div>
 
-    <div class="browse-box__section browse-box__pad">
+    <div class="box__section box__pad">
       <h2>Adapters</h2>
       <p>
         <code>USE_MOCK_ADAPTERS</code> is currently
         <strong>{% if use_mock_adapters %}enabled (mock){% else %}disabled (real — not implemented){% endif %}</strong>.
       </p>
-      <p class="small muted">Set in <code>.env</code> and restart the app.</p>
+      <p class="small muted box-note">Set in <code>.env</code> and restart the app.</p>
     </div>
 
-    <div class="browse-box__section browse-box__pad">
+    <div class="box__section box__pad">
       <h2>YAML preview</h2>
-      <details>
-        <summary>environments.yaml</summary>
-        <pre class="config-preview"><code>{{ env_yaml }}</code></pre>
+      <details class="box-disclosure">
+        <summary class="box-disclosure__summary">environments.yaml</summary>
+        <div class="box-disclosure__body">
+          <pre class="config-preview"><code>{{ env_yaml }}</code></pre>
+        </div>
       </details>
-      <details>
-        <summary>identity_map.yaml</summary>
-        <pre class="config-preview"><code>{{ identity_yaml }}</code></pre>
+      <details class="box-disclosure">
+        <summary class="box-disclosure__summary">identity_map.yaml</summary>
+        <div class="box-disclosure__body">
+          <pre class="config-preview"><code>{{ identity_yaml }}</code></pre>
+        </div>
       </details>
     </div>
   </div>
