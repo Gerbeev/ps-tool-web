@@ -19,6 +19,10 @@ class EnvironmentEntry(BaseModel):
     display_name: str
     region: str | None = None
     connector_profile: str | None = None
+    """autosys | process_scheduler — default scheduler when this env is selected."""
+    scheduler: str | None = None
+    """Scheduler API / agent host (hostname or URL) for this environment."""
+    host: str = ""
 
 
 class IdentityPair(BaseModel):
@@ -81,6 +85,58 @@ def load_environments() -> list[EnvironmentEntry]:
     with path.open(encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     return [EnvironmentEntry.model_validate(e) for e in data.get("environments", [])]
+
+
+def invalidate_environment_cache() -> None:
+    load_environments.cache_clear()
+
+
+def get_environment(environment_id: str) -> EnvironmentEntry | None:
+    for entry in load_environments():
+        if entry.id == environment_id:
+            return entry
+    return None
+
+
+def host_for_environment(environment_id: str) -> str:
+    entry = get_environment(environment_id)
+    return (entry.host or "").strip() if entry else ""
+
+
+def scheduler_for_environment(environment_id: str):
+    from app.models import SchedulerType
+
+    entry = get_environment(environment_id)
+    if entry:
+        return resolve_scheduler(entry)
+    return SchedulerType.AUTOSYS
+
+
+def resolve_scheduler(entry: EnvironmentEntry):
+    from app.models import SchedulerType
+
+    if entry.scheduler in (SchedulerType.AUTOSYS.value, SchedulerType.PROCESS_SCHEDULER.value):
+        return SchedulerType(entry.scheduler)
+    profile = (entry.connector_profile or "").lower()
+    if profile.endswith("_ps") or "_ps_" in profile or profile == "test_ps":
+        return SchedulerType.PROCESS_SCHEDULER
+    return SchedulerType.AUTOSYS
+
+
+def save_environments(entries: list[EnvironmentEntry]) -> None:
+    path = get_settings().config_dir / "environments.yaml"
+    path.parent.mkdir(parents=True, exist_ok=True)
+    payload = {
+        "environments": [
+            {k: v for k, v in entry.model_dump().items() if v is not None and v != ""}
+            for entry in entries
+        ]
+    }
+    header = "# Environment definitions — host & scheduler editable in Settings UI\n"
+    with path.open("w", encoding="utf-8") as f:
+        f.write(header)
+        yaml.safe_dump(payload, f, sort_keys=False, allow_unicode=True, default_flow_style=False)
+    invalidate_environment_cache()
 
 
 @lru_cache

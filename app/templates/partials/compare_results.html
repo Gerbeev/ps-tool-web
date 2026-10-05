@@ -1,6 +1,8 @@
-{% include "partials/summary.html" %}
+<div class="browse-box__section browse-box__pad">
+  {% include "partials/summary.html" %}
+</div>
 
-<div class="export-row">
+<div class="browse-box__section browse-box__pad export-row">
   <a role="button" class="outline"
      href="/api/export/left.csv?session_id={{ session_id }}">Export Left CSV</a>
   <a role="button" class="outline"
@@ -10,30 +12,34 @@
   <input type="hidden" id="session-id" name="session_id" value="{{ session_id }}">
 </div>
 
-<div class="tabs compare-tabs">
-  <details>
-    <summary>Trees</summary>
-    <div class="compare-trees-loader"
-         hx-get="/api/compare/trees?session_id={{ session_id }}"
-         hx-trigger="revealed once"
-         hx-target="this"
-         hx-swap="innerHTML">
-      <p class="muted small">Open to load topology trees…</p>
+<div class="browse-box__section">
+  <details class="box-disclosure">
+    <summary class="box-disclosure__summary">Trees</summary>
+    <div class="box-disclosure__body">
+      <div class="compare-trees-loader"
+           hx-get="/api/compare/trees?session_id={{ session_id }}"
+           hx-trigger="revealed once"
+           hx-target="this"
+           hx-swap="innerHTML">
+        <p class="muted small">Open to load topology trees…</p>
+      </div>
     </div>
   </details>
-  <details open>
-    <summary>Table</summary>
-    <div id="compare-table-panel"
-         hx-get="/api/compare/table?session_id={{ session_id }}&filter={{ table_filter|default('all') }}&limit={{ table_limit|default(0) }}"
-         hx-trigger="load"
-         hx-target="this"
-         hx-swap="innerHTML">
-      <p class="muted small">Loading table…</p>
+  <details class="box-disclosure" open>
+    <summary class="box-disclosure__summary">Table</summary>
+    <div class="box-disclosure__body">
+      <div id="compare-table-panel"
+           hx-get="/api/compare/table?session_id={{ session_id }}&filter={{ table_filter|default('all') }}&limit={{ table_limit|default(0) }}"
+           hx-trigger="load"
+           hx-target="this"
+           hx-swap="innerHTML">
+        <p class="muted small">Loading table…</p>
+      </div>
     </div>
   </details>
 </div>
 
-<section id="job-detail-panel" class="job-detail-panel"></section>
+<section id="job-detail-panel" class="job-detail-panel browse-detail-panel" aria-live="polite"></section>
 
 <script>
   (function () {

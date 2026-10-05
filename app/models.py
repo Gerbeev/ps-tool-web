@@ -60,6 +60,7 @@ class ContextFilters(BaseModel):
 
 class ComparisonContext(BaseModel):
     environment_id: str
+    host: str = ""
     scheduler: SchedulerType
     as_of: AsOf = Field(default_factory=lambda: AsOf(kind=AsOfKind.BUSINESS_DATE, value=""))
     filters: ContextFilters = Field(default_factory=ContextFilters)

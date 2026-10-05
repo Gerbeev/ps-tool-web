@@ -7,7 +7,13 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from app.config import get_settings, load_environments
-from app.models import AsOf, AsOfKind, ComparisonContext, ContextFilters, SchedulerType
+from app.context_helpers import (
+    default_business_date,
+    environment_scheduler_value,
+    parse_compare_side_context,
+    scheduler_label,
+    topology_options,
+)
 from app.search.sqlite_fts import search_index
 from app.services.comparison import compare_contexts, fetch_snapshot, job_status_css
 from app.services.table_rows import iter_table_rows, page_table_rows
@@ -20,18 +26,20 @@ templates.env.globals["job_status_css"] = job_status_css
 templates.env.globals["tree_child_count"] = child_count
 
 
-def _parse_context(
-    environment_id: str,
-    scheduler: str,
-    as_of_value: str,
-    root_box: str | None,
-) -> ComparisonContext:
-    return ComparisonContext(
-        environment_id=environment_id,
-        scheduler=SchedulerType(scheduler),
-        as_of=AsOf(kind=AsOfKind.BUSINESS_DATE, value=as_of_value or "2026-10-02"),
-        filters=ContextFilters(root_box=root_box or None),
-    )
+def _side_form_context(environment_id: str, as_of: str = "", topology: str = ""):
+    scheduler = environment_scheduler_value(environment_id)
+    if not as_of:
+        as_of = default_business_date()
+    topologies = topology_options(environment_id, scheduler)
+    if not topology and topologies:
+        topology = topologies[0]
+    return {
+        "scheduler": scheduler,
+        "scheduler_label": scheduler_label(scheduler),
+        "as_of": as_of,
+        "topology": topology,
+        "topologies": topologies,
+    }
 
 
 def _env_options():
@@ -76,19 +84,45 @@ def _mismatch_logical_ids(result) -> set[str]:
 async def compare_page(request: Request):
     envs = _env_options()
     default_env = envs[0].id if envs else "uat-rd"
+    left_env = default_env
+    right_env = envs[2].id if len(envs) > 2 else default_env
+    left_ctx = _side_form_context(left_env)
+    right_ctx = _side_form_context(right_env)
     return templates.TemplateResponse(
         request,
         "compare.html",
         {
             "environments": envs,
-            "left_env": default_env,
-            "right_env": envs[2].id if len(envs) > 2 else default_env,
-            "left_scheduler": SchedulerType.AUTOSYS.value,
-            "right_scheduler": SchedulerType.PROCESS_SCHEDULER.value,
-            "as_of": "2026-10-02",
+            "left_env": left_env,
+            "right_env": right_env,
+            "left": left_ctx,
+            "right": right_ctx,
             "result": None,
             "session_id": None,
         },
+    )
+
+
+@router.get("/api/compare/side-form", response_class=HTMLResponse)
+async def compare_side_form(
+    request: Request,
+    side: str = Query(..., pattern="^(left|right)$"),
+    environment_id: str = Query(""),
+    left_env: str = Query(""),
+    right_env: str = Query(""),
+    left_as_of: str = Query(""),
+    right_as_of: str = Query(""),
+    left_topology: str = Query(""),
+    right_topology: str = Query(""),
+):
+    env_id = environment_id or (left_env if side == "left" else right_env)
+    as_of = left_as_of if side == "left" else right_as_of
+    topology = left_topology if side == "left" else right_topology
+    ctx = _side_form_context(env_id, as_of=as_of, topology=topology)
+    return templates.TemplateResponse(
+        request,
+        "partials/compare_side_fields.html",
+        {"side": side, **ctx},
     )
 
 
@@ -96,15 +130,20 @@ async def compare_page(request: Request):
 async def run_compare(
     request: Request,
     left_env: str = Form(...),
-    left_scheduler: str = Form(...),
+    left_scheduler: str = Form(""),
+    left_as_of: str = Form(""),
+    left_topology: str = Form(""),
     right_env: str = Form(...),
-    right_scheduler: str = Form(...),
-    as_of: str = Form("2026-10-02"),
-    left_root: str = Form(""),
-    right_root: str = Form(""),
+    right_scheduler: str = Form(""),
+    right_as_of: str = Form(""),
+    right_topology: str = Form(""),
 ):
-    left = _parse_context(left_env, left_scheduler, as_of, left_root or None)
-    right = _parse_context(right_env, right_scheduler, as_of, right_root or None)
+    if not left_scheduler:
+        left_scheduler = environment_scheduler_value(left_env)
+    if not right_scheduler:
+        right_scheduler = environment_scheduler_value(right_env)
+    left = parse_compare_side_context(left_env, left_scheduler, left_as_of, left_topology)
+    right = parse_compare_side_context(right_env, right_scheduler, right_as_of, right_topology)
     left_snap, _ = fetch_snapshot(left)
     right_snap, _ = fetch_snapshot(right)
     result = compare_contexts(left, right)

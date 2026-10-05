@@ -2,40 +2,78 @@
 {% set active_nav = 'settings' %}
 {% block title %}Settings — ps-tool-web{% endblock %}
 {% block content %}
-<section>
-  <h1>Settings</h1>
-  <p class="muted">Configuration shell for Phase 2 — edit YAML on disk or via your deployment pipeline.</p>
+<section class="box-page settings-page">
+  <div class="browse-box">
+    <div class="browse-box__section browse-box__pad">
+      <h1>Settings</h1>
+      {% if saved %}
+      <p class="settings-saved" role="status">Environment settings saved.</p>
+      {% endif %}
+      <p class="muted">Host and scheduler type per environment. Browse and Compare use these values automatically.</p>
+    </div>
 
-  <article>
-    <h2>Adapters</h2>
-    <p>
-      <code>USE_MOCK_ADAPTERS</code> is currently
-      <strong>{% if use_mock_adapters %}enabled (mock){% else %}disabled (real — not implemented){% endif %}</strong>.
-    </p>
-    <p class="small muted">Set in <code>.env</code> and restart the app. Real UBS connectors are wired when <code>USE_MOCK_ADAPTERS=false</code>.</p>
-  </article>
+    <div class="browse-box__section browse-box__pad">
+      <h2>Environments</h2>
+      <p class="small muted">Saved to <code>{{ config_dir }}/environments.yaml</code></p>
+      <form method="post" action="/api/settings/environments" class="settings-env-form">
+        <table class="settings-env-table" role="grid">
+          <thead>
+            <tr>
+              <th>Environment</th>
+              <th>ID</th>
+              <th>Host</th>
+              <th>Scheduler</th>
+            </tr>
+          </thead>
+          <tbody>
+            {% for env in environments %}
+            <tr>
+              <td>{{ env.display_name }}{% if env.region %} <span class="muted small">({{ env.region }})</span>{% endif %}</td>
+              <td><code>{{ env.id }}</code></td>
+              <td>
+                <input type="text"
+                       name="host_{{ env.id }}"
+                       class="app-control settings-env-host"
+                       value="{{ env.host or '' }}"
+                       placeholder="hostname or URL"
+                       required
+                       aria-label="Host for {{ env.display_name }}">
+              </td>
+              <td>
+                <select name="scheduler_{{ env.id }}" class="app-control settings-env-select" aria-label="Scheduler for {{ env.display_name }}">
+                  {% for value, label in scheduler_choices %}
+                  <option value="{{ value }}" {% if resolved_schedulers[env.id] == value %}selected{% endif %}>{{ label }}</option>
+                  {% endfor %}
+                </select>
+              </td>
+            </tr>
+            {% endfor %}
+          </tbody>
+        </table>
+        <button type="submit">Save environments</button>
+      </form>
+    </div>
 
-  <article>
-    <h2>Environments</h2>
-    <p class="small muted">Path: <code>{{ config_dir }}/environments.yaml</code></p>
-    <ul>
-      {% for env in environments %}
-      <li><code>{{ env.id }}</code> — {{ env.display_name }}{% if env.region %} ({{ env.region }}){% endif %}</li>
-      {% endfor %}
-    </ul>
-    <details>
-      <summary>YAML preview</summary>
-      <pre class="config-preview"><code>{{ env_yaml }}</code></pre>
-    </details>
-  </article>
+    <div class="browse-box__section browse-box__pad">
+      <h2>Adapters</h2>
+      <p>
+        <code>USE_MOCK_ADAPTERS</code> is currently
+        <strong>{% if use_mock_adapters %}enabled (mock){% else %}disabled (real — not implemented){% endif %}</strong>.
+      </p>
+      <p class="small muted">Set in <code>.env</code> and restart the app.</p>
+    </div>
 
-  <article>
-    <h2>Identity map</h2>
-    <p><a href="file://{{ identity_map_path }}">identity_map.yaml</a> (local path on server)</p>
-    <details>
-      <summary>YAML preview</summary>
-      <pre class="config-preview"><code>{{ identity_yaml }}</code></pre>
-    </details>
-  </article>
+    <div class="browse-box__section browse-box__pad">
+      <h2>YAML preview</h2>
+      <details>
+        <summary>environments.yaml</summary>
+        <pre class="config-preview"><code>{{ env_yaml }}</code></pre>
+      </details>
+      <details>
+        <summary>identity_map.yaml</summary>
+        <pre class="config-preview"><code>{{ identity_yaml }}</code></pre>
+      </details>
+    </div>
+  </div>
 </section>
 {% endblock %}

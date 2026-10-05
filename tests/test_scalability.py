@@ -50,9 +50,10 @@ def test_compare_table_endpoint_all_by_default():
         data={
             "left_env": "uat-rd",
             "left_scheduler": "autosys",
+            "left_as_of": "2026-10-02",
             "right_env": "test-rd",
             "right_scheduler": "process_scheduler",
-            "as_of": "2026-10-02",
+            "right_topology": "RISK_ANALYTICS",
         },
     )
     assert resp.status_code == 200
@@ -152,9 +153,10 @@ def test_search_requires_session_id():
         data={
             "left_env": "uat-rd",
             "left_scheduler": "autosys",
+            "left_as_of": "2026-10-02",
             "right_env": "test-rd",
             "right_scheduler": "process_scheduler",
-            "as_of": "2026-10-02",
+            "right_topology": "RISK_ANALYTICS",
         },
     )
     import re

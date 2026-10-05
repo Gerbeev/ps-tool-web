@@ -4,9 +4,9 @@
         hx-target="#compare-table-panel"
         hx-swap="innerHTML">
     <input type="hidden" name="session_id" value="{{ session_id }}">
-    <label>
-      Filter
-      <select name="filter">
+    <label class="browse-field-stack">
+      <span class="browse-field-label">Filter</span>
+      <select name="filter" class="app-control">
         <option value="all" {% if filter == 'all' %}selected{% endif %}>All rows</option>
         <option value="mismatches" {% if filter == 'mismatches' %}selected{% endif %}>Diffs only</option>
         <option value="matched" {% if filter == 'matched' %}selected{% endif %}>Paired (both sides)</option>
@@ -15,13 +15,13 @@
         <option value="right_only" {% if filter == 'right_only' %}selected{% endif %}>Right only</option>
       </select>
     </label>
-    <label>
-      Name prefix
-      <input type="text" name="q_prefix" value="{{ q_prefix or '' }}" placeholder="RISK_">
+    <label class="browse-field-stack">
+      <span class="browse-field-label">Name prefix</span>
+      <input type="text" name="q_prefix" class="app-control" value="{{ q_prefix or '' }}" placeholder="RISK_">
     </label>
-    <label>
-      Page size
-      <select name="limit">
+    <label class="browse-field-stack">
+      <span class="browse-field-label">Page size</span>
+      <select name="limit" class="app-control">
         <option value="0" {% if not limit %}selected{% endif %}>All (default)</option>
         <option value="50" {% if limit == 50 %}selected{% endif %}>50</option>
         <option value="100" {% if limit == 100 %}selected{% endif %}>100</option>

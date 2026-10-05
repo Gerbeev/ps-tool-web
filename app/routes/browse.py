@@ -6,14 +6,20 @@ from fastapi import APIRouter, Form, Request
 from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
-from app.adapters.factory import get_adapter
 from app.browse_status_filters import (
     BROWSE_STATUS_FILTER_ORDER,
     BROWSE_STATUS_INACTIVE_VALUES,
     BROWSE_STATUS_LABELS,
 )
 from app.config import load_environments
-from app.models import AsOf, AsOfKind, ComparisonContext, ContextFilters, SchedulerType
+from app.context_helpers import (
+    default_business_date,
+    environment_scheduler_value,
+    parse_browse_context,
+    scheduler_label,
+    topology_options,
+)
+from app.models import SchedulerType
 from app.search.sqlite_fts import search_index
 from app.services.comparison import fetch_snapshot, job_status_css
 from app.services.topology_index import child_count, get_child_nodes, lazy_roots
@@ -32,41 +38,13 @@ def _env_options():
     return load_environments()
 
 
-def _topology_options(environment_id: str, scheduler: str) -> list[str]:
-    if scheduler != SchedulerType.PROCESS_SCHEDULER.value:
-        return []
-    adapter = get_adapter(SchedulerType.PROCESS_SCHEDULER, environment_id)
-    ctx = ComparisonContext(environment_id=environment_id, scheduler=SchedulerType.PROCESS_SCHEDULER)
-    return adapter.list_roots(ctx)
-
-
-def _parse_browse_context(
-    environment_id: str,
-    scheduler: str,
-    as_of: str,
-    topology: str,
-) -> ComparisonContext:
-    sched = SchedulerType(scheduler)
-    filters = ContextFilters()
-    if sched == SchedulerType.PROCESS_SCHEDULER and topology:
-        filters.topology_id = topology
-        filters.root_box = topology
-    elif sched == SchedulerType.AUTOSYS:
-        filters.root_box = "RISK_DAILY_BOX"
-    return ComparisonContext(
-        environment_id=environment_id,
-        scheduler=sched,
-        as_of=AsOf(kind=AsOfKind.BUSINESS_DATE, value=as_of or "2026-10-02"),
-        filters=filters,
-    )
-
-
 @router.get("/browse", response_class=HTMLResponse)
 async def browse_page(request: Request):
     envs = _env_options()
     default_env = envs[0].id if envs else "uat-rd"
-    scheduler = SchedulerType.PROCESS_SCHEDULER.value
-    topologies = _topology_options(default_env, scheduler)
+    scheduler = environment_scheduler_value(default_env)
+    as_of = default_business_date()
+    topologies = topology_options(default_env, scheduler)
     return templates.TemplateResponse(
         request,
         "browse.html",
@@ -74,7 +52,8 @@ async def browse_page(request: Request):
             "environments": envs,
             "environment_id": default_env,
             "scheduler": scheduler,
-            "as_of": "2026-10-02",
+            "scheduler_label": scheduler_label(scheduler),
+            "as_of": as_of,
             "topology": topologies[0] if topologies else "",
             "topologies": topologies,
             "session_id": None,
@@ -87,11 +66,15 @@ async def browse_page(request: Request):
 async def browse_form_partial(
     request: Request,
     environment_id: str = "uat-rd",
-    scheduler: str = SchedulerType.PROCESS_SCHEDULER.value,
-    as_of: str = "2026-10-02",
+    scheduler: str = "",
+    as_of: str = "",
     topology: str = "",
 ):
-    topologies = _topology_options(environment_id, scheduler)
+    if not scheduler:
+        scheduler = environment_scheduler_value(environment_id)
+    if not as_of:
+        as_of = default_business_date()
+    topologies = topology_options(environment_id, scheduler)
     if not topology and topologies:
         topology = topologies[0]
     return templates.TemplateResponse(
@@ -110,11 +93,15 @@ async def browse_form_partial(
 async def browse_load(
     request: Request,
     environment_id: str = Form(...),
-    scheduler: str = Form(...),
-    as_of: str = Form("2026-10-02"),
+    scheduler: str = Form(""),
+    as_of: str = Form(""),
     topology: str = Form(""),
 ):
-    context = _parse_browse_context(environment_id, scheduler, as_of, topology)
+    if not scheduler:
+        scheduler = environment_scheduler_value(environment_id)
+    if not as_of:
+        as_of = default_business_date()
+    context = parse_browse_context(environment_id, scheduler, as_of, topology)
     snapshot, _ = fetch_snapshot(context)
     search_index.rebuild(snapshot, "left")
     sid = session_store.new_id()
@@ -132,12 +119,12 @@ async def browse_load(
     )
 
 
-def _meta_line(context: ComparisonContext, meta: dict) -> str:
-    if context.scheduler == SchedulerType.AUTOSYS:
-        bd = meta.get("business_date") or context.as_of.value
-        return f"AutoSys · business date {bd}"
-    topo = meta.get("topology_id") or context.filters.topology_id or "—"
-    return f"Process Scheduler · topology {topo}"
+def _meta_line(context, meta: dict) -> str:
+    if context.scheduler == SchedulerType.PROCESS_SCHEDULER:
+        topo = meta.get("topology_id") or context.filters.topology_id or "—"
+        return f"Process Scheduler · topology {topo}"
+    bd = meta.get("business_date") or context.as_of.value
+    return f"AutoSys · business date {bd}"
 
 
 @router.get("/api/browse/job/{uid}", response_class=HTMLResponse)

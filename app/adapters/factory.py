@@ -16,7 +16,7 @@ def get_adapter(scheduler: SchedulerType, environment_id: str) -> SchedulerAdapt
     import connectors.autosys / connectors.process_scheduler and wrap them
     in new SchedulerAdapter implementations alongside the mocks.
     """
-    _ = environment_id  # reserved for connector_profile / credentials lookup
+    _ = environment_id  # use get_environment(environment_id) for host / connector_profile
     settings = get_settings()
     if settings.use_mock_adapters:
         if scheduler == SchedulerType.AUTOSYS:

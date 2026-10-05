@@ -28,7 +28,14 @@
       return;
     }
     var env = selectedLabel('browse-env');
-    var sched = selectedLabel('browse-scheduler');
+    var schedVal = document.getElementById('browse-scheduler');
+    var schedType = schedVal ? schedVal.value : '';
+    var sched =
+      schedType === 'process_scheduler'
+        ? 'Process Scheduler'
+        : schedType === 'autosys'
+          ? 'AutoSys'
+          : '';
     var parts = [];
     if (env) {
       parts.push(env);
@@ -36,8 +43,6 @@
     if (sched) {
       parts.push(sched);
     }
-    var schedVal = document.getElementById('browse-scheduler');
-    var schedType = schedVal ? schedVal.value : '';
     if (schedType === 'process_scheduler') {
       var topo = document.getElementById('browse-topology');
       if (topo && topo.value) {

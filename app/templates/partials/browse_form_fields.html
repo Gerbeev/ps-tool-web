@@ -1,8 +1,9 @@
+<input type="hidden" name="scheduler" id="browse-scheduler" value="{{ scheduler }}">
 <input type="hidden" name="as_of" id="browse-as-of" value="{{ as_of }}">
 {% if scheduler == 'process_scheduler' %}
 <label class="browse-field-stack">
   <span class="browse-field-label">Topology</span>
-  <select name="topology" id="browse-topology">
+  <select name="topology" id="browse-topology" class="app-control">
     {% for t in topologies %}
     <option value="{{ t }}" {% if t == topology %}selected{% endif %}>{{ t }}</option>
     {% endfor %}
