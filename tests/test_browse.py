@@ -14,6 +14,9 @@ def test_browse_page_renders():
     resp = client.get("/browse")
     assert resp.status_code == 200
     assert "Browse environment" in resp.text
+    assert 'id="browse-env-toggle"' in resp.text
+    assert 'id="browse-env-panel"' in resp.text
+    assert "/static/js/browse-env-panel.js" in resp.text
     assert 'hx-post="/api/browse/load"' in resp.text
 
 
