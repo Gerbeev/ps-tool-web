@@ -108,10 +108,18 @@
     setCollapsed(stored === 'collapsed');
   }
 
-  document.addEventListener('DOMContentLoaded', initBrowseEnvPanel);
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initBrowseEnvPanel);
+  } else {
+    initBrowseEnvPanel();
+  }
+
   document.body.addEventListener('htmx:afterSwap', function (evt) {
     var target = evt.detail && evt.detail.target;
-    if (target && target.id === 'browse-context-fields') {
+    if (!target) {
+      return;
+    }
+    if (target.id === 'browse-context-fields' || target.id === 'browse-output') {
       bindFormListeners();
       refreshSummary();
     }

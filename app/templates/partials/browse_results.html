@@ -1,5 +1,7 @@
-<p class="browse-meta"><strong>{{ meta_line }}</strong> · {{ snapshot.flat_jobs|length }} jobs</p>
 <input type="hidden" id="session-id" name="session_id" value="{{ session_id }}">
+<header class="browse-results-head browse-band">
+  <p class="browse-meta"><strong>{{ meta_line }}</strong> · {{ snapshot.flat_jobs|length }} jobs</p>
+</header>
 <div id="browse-workspace" class="browse-workspace">
   <div class="browse-tree-column">
     <div class="browse-tree-wrap">

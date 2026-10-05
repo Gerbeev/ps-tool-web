@@ -30,7 +30,7 @@ BROWSE_STATUS_LABELS: dict[JobStatus, str] = {
     JobStatus.UNKNOWN: "Unknown",
 }
 
-# Stable dropdown order (active outcomes first, then inactive bucket members).
+# Dropdown order (common outcomes first, then idle / non-terminal states).
 BROWSE_STATUS_FILTER_ORDER: tuple[JobStatus, ...] = (
     JobStatus.SUCCESS,
     JobStatus.FAILURE,

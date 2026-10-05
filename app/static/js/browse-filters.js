@@ -1,18 +1,176 @@
 (function () {
-  var FILTERS_STORAGE_KEY = 'ps-tool-browse-filters';
+  if (window.__psBrowseFiltersBootstrapped) {
+    return;
+  }
+  window.__psBrowseFiltersBootstrapped = true;
+
+  var pickerListenersBound = false;
 
   function inactiveStatuses() {
-    var statusEl = document.getElementById('browse-filter-status');
-    if (!statusEl) {
+    var root = document.getElementById('browse-filter-status');
+    if (!root) {
       return ['pending', 'not_run', 'disabled', 'killed', 'unknown'];
     }
-    var raw = statusEl.getAttribute('data-inactive-statuses') || '';
-    return raw
+    return (root.getAttribute('data-inactive-statuses') || '')
       .split(',')
       .map(function (s) {
         return s.trim();
       })
       .filter(Boolean);
+  }
+
+  function statusCheckboxes() {
+    return Array.prototype.slice.call(document.querySelectorAll('.browse-status-checkbox'));
+  }
+
+  function getSelectedStatuses() {
+    var checked = statusCheckboxes().filter(function (el) {
+      return el.checked;
+    });
+    if (!checked.length) {
+      return null;
+    }
+    return checked.map(function (el) {
+      return el.value;
+    });
+  }
+
+  function updatePickerLabel() {
+    var labelEl = document.getElementById('browse-status-picker-label');
+    if (!labelEl) {
+      return;
+    }
+    var selected = getSelectedStatuses();
+    if (!selected) {
+      labelEl.textContent = 'All statuses';
+      return;
+    }
+    if (selected.length === 1) {
+      var text = selected[0];
+      statusCheckboxes().forEach(function (box) {
+        if (box.checked) {
+          var row = box.closest('.browse-status-picker-row');
+          var span = row ? row.querySelector('.browse-status-picker-row-label') : null;
+          if (span) {
+            text = span.textContent.trim();
+          }
+        }
+      });
+      labelEl.textContent = text;
+      return;
+    }
+    labelEl.textContent = selected.length + ' selected';
+  }
+
+  function getPopover() {
+    return document.getElementById('browse-status-picker-popover');
+  }
+
+  function getTrigger() {
+    return document.getElementById('browse-status-picker-trigger');
+  }
+
+  function positionPopover() {
+    var trigger = getTrigger();
+    var popover = getPopover();
+    if (!trigger || !popover || popover.hidden) {
+      return;
+    }
+    var rect = trigger.getBoundingClientRect();
+    var width = Math.max(rect.width, 240);
+    popover.style.position = 'fixed';
+    popover.style.top = Math.round(rect.bottom + 4) + 'px';
+    popover.style.left = Math.round(rect.left) + 'px';
+    popover.style.width = Math.round(width) + 'px';
+    popover.style.zIndex = '200';
+  }
+
+  function setPopoverOpen(open) {
+    var trigger = getTrigger();
+    var popover = getPopover();
+    if (!trigger || !popover) {
+      return;
+    }
+    if (open) {
+      popover.removeAttribute('hidden');
+      trigger.setAttribute('aria-expanded', 'true');
+      positionPopover();
+    } else {
+      popover.setAttribute('hidden', '');
+      trigger.setAttribute('aria-expanded', 'false');
+    }
+  }
+
+  function applyStatusPreset(preset) {
+    var inactive = inactiveStatuses();
+    statusCheckboxes().forEach(function (box) {
+      if (preset === 'all') {
+        box.checked = false;
+      } else if (preset === 'inactive') {
+        box.checked = inactive.indexOf(box.value) !== -1;
+      }
+    });
+    updatePickerLabel();
+    applyBrowseFilters();
+  }
+
+  function bindPickerGlobalListeners() {
+    if (pickerListenersBound) {
+      return;
+    }
+    pickerListenersBound = true;
+
+    window.addEventListener('resize', positionPopover);
+    window.addEventListener('scroll', positionPopover, true);
+
+    document.addEventListener('click', function (e) {
+      var picker = document.getElementById('browse-filter-status');
+      if (!picker || picker.contains(e.target)) {
+        return;
+      }
+      setPopoverOpen(false);
+    });
+
+    document.addEventListener('keydown', function (e) {
+      if (e.key === 'Escape') {
+        setPopoverOpen(false);
+      }
+    });
+  }
+
+  function bindStatusPicker() {
+    var picker = document.getElementById('browse-filter-status');
+    if (!picker || picker.getAttribute('data-browse-status-bound') === 'true') {
+      return;
+    }
+    picker.setAttribute('data-browse-status-bound', 'true');
+
+    bindPickerGlobalListeners();
+
+    var trigger = getTrigger();
+    if (trigger) {
+      trigger.addEventListener('click', function (e) {
+        e.stopPropagation();
+        var open = trigger.getAttribute('aria-expanded') === 'true';
+        setPopoverOpen(!open);
+      });
+    }
+
+    statusCheckboxes().forEach(function (box) {
+      box.addEventListener('change', function () {
+        updatePickerLabel();
+        applyBrowseFilters();
+      });
+    });
+
+    Array.prototype.forEach.call(picker.querySelectorAll('.browse-status-picker-action'), function (btn) {
+      btn.addEventListener('click', function (e) {
+        e.preventDefault();
+        applyStatusPreset(btn.getAttribute('data-status-preset'));
+      });
+    });
+
+    updatePickerLabel();
   }
 
   function getPane() {
@@ -27,15 +185,12 @@
     return name.indexOf(query.toLowerCase()) !== -1;
   }
 
-  function rowMatchesStatus(row, statusFilter) {
-    if (!statusFilter || statusFilter === 'all') {
+  function rowMatchesStatus(row, selectedStatuses) {
+    if (!selectedStatuses || !selectedStatuses.length) {
       return true;
     }
     var status = row.getAttribute('data-status') || '';
-    if (statusFilter === 'inactive') {
-      return inactiveStatuses().indexOf(status) !== -1;
-    }
-    return status === statusFilter;
+    return selectedStatuses.indexOf(status) !== -1;
   }
 
   function directChildNodes(node) {
@@ -70,7 +225,7 @@
     }
 
     var nameOk = rowMatchesName(row, window.psBrowseFilterQuery || '');
-    var statusOk = rowMatchesStatus(row, window.psBrowseFilterStatus || 'all');
+    var statusOk = rowMatchesStatus(row, window.psBrowseFilterStatuses);
     var selfMatch = nameOk && statusOk;
 
     var children = directChildNodes(node);
@@ -107,7 +262,7 @@
     if (!anyVisible) {
       if (!empty) {
         empty = document.createElement('p');
-        empty.className = 'browse-filter-empty muted';
+        empty.className = 'browse-filter-empty browse-band-content muted';
         empty.textContent = 'No jobs match the current filters.';
         body.appendChild(empty);
       }
@@ -123,9 +278,8 @@
       return;
     }
     var searchEl = document.getElementById('browse-filter-search');
-    var statusEl = document.getElementById('browse-filter-status');
     window.psBrowseFilterQuery = searchEl ? searchEl.value.trim() : '';
-    window.psBrowseFilterStatus = statusEl ? statusEl.value : 'all';
+    window.psBrowseFilterStatuses = getSelectedStatuses();
 
     var body = pane.querySelector('.browse-tree-body');
     if (!body) {
@@ -142,83 +296,18 @@
     updateEmptyState(pane, anyVisible);
   }
 
-  function updateFiltersSummary() {
-    var hint = document.getElementById('browse-filters-summary');
-    var searchEl = document.getElementById('browse-filter-search');
-    var statusEl = document.getElementById('browse-filter-status');
-    if (!hint) {
-      return;
-    }
-    var parts = [];
-    if (searchEl && searchEl.value.trim()) {
-      parts.push('Search: ' + searchEl.value.trim());
-    }
-    if (statusEl && statusEl.value && statusEl.value !== 'all') {
-      var label = statusEl.options[statusEl.selectedIndex];
-      parts.push(label ? label.text.trim() : statusEl.value);
-    }
-    hint.textContent = parts.length ? parts.join(' · ') : 'Search & status';
-  }
-
-  function setFiltersCollapsed(collapsed) {
-    var panel = document.getElementById('browse-filters-panel');
-    var btn = document.getElementById('browse-filters-toggle');
-    var hint = document.getElementById('browse-filters-summary');
-    if (!panel || !btn) {
-      return;
-    }
-    panel.classList.toggle('is-collapsed', collapsed);
-    btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
-    if (hint) {
-      if (collapsed) {
-        hint.removeAttribute('hidden');
-      } else {
-        hint.setAttribute('hidden', '');
-      }
-    }
-    localStorage.setItem(FILTERS_STORAGE_KEY, collapsed ? 'collapsed' : 'expanded');
-    updateFiltersSummary();
-  }
-
-  function bindFiltersPanel() {
-    var panel = document.getElementById('browse-filters-panel');
-    var btn = document.getElementById('browse-filters-toggle');
-    if (!panel || !btn || panel.getAttribute('data-browse-filters-panel-bound') === 'true') {
-      return;
-    }
-    panel.setAttribute('data-browse-filters-panel-bound', 'true');
-
-    var stored = localStorage.getItem(FILTERS_STORAGE_KEY);
-    setFiltersCollapsed(stored === 'collapsed');
-
-    btn.addEventListener('click', function () {
-      setFiltersCollapsed(!panel.classList.contains('is-collapsed'));
-    });
-
-    updateFiltersSummary();
-  }
-
   function bindPane(pane) {
     if (!pane || pane.getAttribute('data-browse-filters-bound') === 'true') {
       return;
     }
     pane.setAttribute('data-browse-filters-bound', 'true');
 
-    bindFiltersPanel();
+    setPopoverOpen(false);
+    bindStatusPicker();
 
     var searchEl = document.getElementById('browse-filter-search');
-    var statusEl = document.getElementById('browse-filter-status');
     if (searchEl) {
-      searchEl.addEventListener('input', function () {
-        updateFiltersSummary();
-        applyBrowseFilters();
-      });
-    }
-    if (statusEl) {
-      statusEl.addEventListener('change', function () {
-        updateFiltersSummary();
-        applyBrowseFilters();
-      });
+      searchEl.addEventListener('input', applyBrowseFilters);
     }
 
     var body = pane.querySelector('.browse-tree-body');
@@ -254,6 +343,7 @@
         target.id === 'browse-output' ||
         target.closest('.browse-tree-pane'))
     ) {
+      setPopoverOpen(false);
       initBrowseFilters();
       applyBrowseFilters();
     }

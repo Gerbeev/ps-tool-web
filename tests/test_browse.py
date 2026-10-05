@@ -14,8 +14,8 @@ def test_browse_page_renders():
     resp = client.get("/browse")
     assert resp.status_code == 200
     assert "Select environment" in resp.text
-    assert 'id="browse-context-toggle"' in resp.text
-    assert 'id="browse-context-panel"' in resp.text
+    assert 'id="browse-env-toggle"' in resp.text
+    assert 'id="browse-env-panel"' in resp.text
     assert 'hx-post="/api/browse/load"' in resp.text
 
 
@@ -33,12 +33,13 @@ def test_browse_load_returns_full_width_tree_and_lazy_nodes():
     html = resp.text
     assert "browse-workspace" in html
     assert "browse-tree-header" in html
-    assert 'id="browse-filters-panel"' in html
-    assert "browse-tree-toolbar" in html
+    assert "browse-filters" in html
     assert 'id="browse-filter-search"' in html
     assert 'id="browse-filter-status"' in html
-    assert 'value="inactive"' in html
+    assert 'browse-status-picker-trigger' in html
+    assert 'browse-status-checkbox' in html
     assert 'data-inactive-statuses="' in html
+    assert 'data-status-preset="inactive"' in html
     for status in JobStatus:
         assert f'value="{status.value}"' in html
     assert "browse-job-row" in html

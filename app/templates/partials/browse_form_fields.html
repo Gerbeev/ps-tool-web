@@ -1,6 +1,7 @@
 <input type="hidden" name="as_of" id="browse-as-of" value="{{ as_of }}">
 {% if scheduler == 'process_scheduler' %}
-<label>Topology
+<label class="browse-field-stack">
+  <span class="browse-field-label">Topology</span>
   <select name="topology" id="browse-topology">
     {% for t in topologies %}
     <option value="{{ t }}" {% if t == topology %}selected{% endif %}>{{ t }}</option>
@@ -12,7 +13,8 @@
 </label>
 <p class="small muted">Process Scheduler environments may expose multiple topologies.</p>
 {% else %}
-<label>Business date
+<label class="browse-field-stack">
+  <span class="browse-field-label">Business date</span>
   <input type="date" name="as_of" id="browse-as-of-visible" value="{{ as_of }}"
          onchange="document.getElementById('browse-as-of').value = this.value">
 </label>
