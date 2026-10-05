@@ -1,28 +1,28 @@
 <div class="box-card-grid">
-  <div class="box box--inset summary-card" role="button" tabindex="0" data-compare-preset="matched">
-    <div class="box__pad">
-      <p class="summary-card__title">Matched</p>
-      <p class="card-value">{{ result.summary.matched }}</p>
-    </div>
-  </div>
-  <div class="box box--inset summary-card" role="button" tabindex="0" data-compare-preset="status_delta">
-    <div class="box__pad">
-      <p class="summary-card__title">Status Δ</p>
-      <p class="card-value">{{ result.summary.mismatched_status }}</p>
-    </div>
-  </div>
-  <div class="box box--inset summary-card" role="button" tabindex="0" data-compare-preset="left_only">
-    <div class="box__pad">
-      <p class="summary-card__title">Left only</p>
-      <p class="card-value">{{ result.summary.left_only_count }}</p>
-    </div>
-  </div>
-  <div class="box box--inset summary-card" role="button" tabindex="0" data-compare-preset="right_only">
-    <div class="box__pad">
-      <p class="summary-card__title">Right only</p>
-      <p class="card-value">{{ result.summary.right_only_count }}</p>
-    </div>
-  </div>
+  <button type="button" class="box box--inset summary-card" aria-pressed="false" data-compare-preset="matched">
+    <span class="box__pad">
+      <span class="summary-card__title">Paired jobs</span>
+      <span class="card-value">{{ result.summary.matched }}</span>
+    </span>
+  </button>
+  <button type="button" class="box box--inset summary-card" aria-pressed="false" data-compare-preset="status_delta">
+    <span class="box__pad">
+      <span class="summary-card__title">Status Δ</span>
+      <span class="card-value">{{ result.summary.mismatched_status }}</span>
+    </span>
+  </button>
+  <button type="button" class="box box--inset summary-card" aria-pressed="false" data-compare-preset="left_only">
+    <span class="box__pad">
+      <span class="summary-card__title">Left only</span>
+      <span class="card-value">{{ result.summary.left_only_count }}</span>
+    </span>
+  </button>
+  <button type="button" class="box box--inset summary-card" aria-pressed="false" data-compare-preset="right_only">
+    <span class="box__pad">
+      <span class="summary-card__title">Right only</span>
+      <span class="card-value">{{ result.summary.right_only_count }}</span>
+    </span>
+  </button>
 </div>
 <p class="muted small box-note box-note--after">
   Left jobs: {{ result.summary.total_left }} · Right jobs: {{ result.summary.total_right }}

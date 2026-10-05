@@ -2,7 +2,7 @@
 {% set job = node.job %}
 {% set n_children = tree_child_count(snapshot, job.job_uid) %}
 {% set branch_open = depth < 2 %}
-<div class="browse-tree-node" style="--browse-depth: {{ depth }}">
+<div class="browse-tree-node" data-depth="{{ depth }}">
   <div class="browse-row-grid browse-job-row"
        role="row"
        tabindex="0"
@@ -12,7 +12,7 @@
        hx-target="#job-detail-panel"
        hx-swap="innerHTML"
        hx-on::after-request="window.psBrowseOpenPanel && window.psBrowseOpenPanel(this)"
-       onkeydown="if (event.key === 'Enter' || event.key === ' ') { event.preventDefault(); this.click(); }">
+       onkeydown="if (event.target === this && (event.key === 'Enter' || event.key === ' ')) { event.preventDefault(); this.click(); }">
     {% if n_children %}
     <button type="button"
             class="browse-tree-expand-btn"

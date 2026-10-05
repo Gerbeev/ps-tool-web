@@ -55,21 +55,6 @@
     return document.getElementById('compare-category-picker-trigger');
   }
 
-  function positionPopover() {
-    var trigger = getTrigger();
-    var popover = getPopover();
-    if (!trigger || !popover || popover.hidden) {
-      return;
-    }
-    var rect = trigger.getBoundingClientRect();
-    var width = Math.max(rect.width, 240);
-    popover.style.position = 'fixed';
-    popover.style.top = Math.round(rect.bottom + 4) + 'px';
-    popover.style.left = Math.round(rect.left) + 'px';
-    popover.style.width = Math.round(width) + 'px';
-    popover.style.zIndex = '200';
-  }
-
   function setPopoverOpen(open) {
     var trigger = getTrigger();
     var popover = getPopover();
@@ -79,7 +64,6 @@
     if (open) {
       popover.removeAttribute('hidden');
       trigger.setAttribute('aria-expanded', 'true');
-      positionPopover();
     } else {
       popover.setAttribute('hidden', '');
       trigger.setAttribute('aria-expanded', 'false');
@@ -102,6 +86,9 @@
         box.checked = box.value === 'right_only';
       }
     });
+    document.querySelectorAll('.summary-card').forEach(function (card) {
+      card.setAttribute('aria-pressed', card.getAttribute('data-compare-preset') === preset ? 'true' : 'false');
+    });
     updateCategoryLabel();
     applyCompareTableFilters();
   }
@@ -111,6 +98,9 @@
       return;
     }
     pickerListenersBound = true;
+    document.addEventListener('keydown', function (evt) {
+      if (evt.key === 'Escape') { setPopoverOpen(false); }
+    });
     document.addEventListener('click', function (evt) {
       var picker = document.getElementById('compare-filter-categories');
       if (!picker || picker.contains(evt.target)) {
@@ -118,12 +108,6 @@
       }
       setPopoverOpen(false);
     });
-    window.addEventListener('resize', function () {
-      positionPopover();
-    });
-    window.addEventListener('scroll', function () {
-      positionPopover();
-    }, true);
   }
 
   function bindCategoryPicker() {

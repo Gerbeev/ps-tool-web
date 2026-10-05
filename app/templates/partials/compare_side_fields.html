@@ -1,5 +1,4 @@
 <input type="hidden" name="{{ side }}_scheduler" id="compare-{{ side }}-scheduler" value="{{ scheduler }}">
-<p class="small muted box-note">{{ scheduler_label }}</p>
 {% if scheduler == 'process_scheduler' %}
 <label class="box-field-stack">
   <span class="box-field-label">Topology</span>
@@ -24,3 +23,4 @@
 </label>
 <input type="hidden" name="{{ side }}_topology" value="">
 {% endif %}
+<p class="scheduler-note">{{ scheduler_label }}</p>

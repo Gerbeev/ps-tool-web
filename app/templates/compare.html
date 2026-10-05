@@ -3,19 +3,25 @@
 {% block title %}Compare — ps-tool-web{% endblock %}
 {% block content %}
 <section class="box-page">
+  <header class="page-heading">
+    <p class="page-eyebrow">Scheduler workspace</p>
+    <h1>Compare schedulers</h1>
+    <p class="box-lead">Compare two environments to find differences in jobs, statuses and parameters.</p>
+  </header>
   <div id="compare-context-panel" class="box">
     <div class="box__section box__pad">
-      <h1>Compare schedulers</h1>
+      <h2>Comparison context</h2>
       <p class="muted box-lead">Scheduler type per environment is set in <a href="/settings">Settings</a>.</p>
     </div>
     <div class="box__section box__pad">
       <form id="compare-form"
             hx-post="/api/compare"
+            hx-disabled-elt="#compare-form button[type='submit']"
             hx-target="#compare-output"
             hx-indicator="#compare-spinner">
         <div class="box-grid-2">
           <div class="box box--inset">
-            <div class="box__pad">
+            <div class="box__pad context-fields">
               <p class="box-field-label box-legend">Left (A)</p>
               <label class="box-field-stack">
                 <span class="box-field-label">Environment</span>
@@ -39,7 +45,7 @@
             </div>
           </div>
           <div class="box box--inset">
-            <div class="box__pad">
+            <div class="box__pad context-fields">
               <p class="box-field-label box-legend">Right (B)</p>
               <label class="box-field-stack">
                 <span class="box-field-label">Environment</span>
@@ -72,7 +78,12 @@
   </div>
 
   <div id="compare-output" class="box box-output">
-    <p class="box__pad muted box-output-placeholder">Select contexts and click Compare to load mock topology diff.</p>
+    {% from 'macros/lucide_icons.html' import compare_icon %}
+    <div class="empty-state">
+      <span class="empty-state-icon" aria-hidden="true">{{ compare_icon() }}</span>
+      <h2>Ready to find the differences</h2>
+      <p class="box-output-placeholder">Select the left and right contexts, then click Compare.</p>
+    </div>
   </div>
 </section>
 {% endblock %}

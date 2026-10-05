@@ -16,14 +16,13 @@
               id="compare-category-picker-trigger"
               class="browse-status-picker-trigger app-control app-control--picker"
               aria-expanded="false"
-              aria-haspopup="listbox"
+              aria-haspopup="dialog"
               aria-controls="compare-category-picker-popover">
         <span id="compare-category-picker-label" class="browse-status-picker-label">All rows</span>
       </button>
       <div id="compare-category-picker-popover"
            class="browse-status-picker-popover"
-           role="listbox"
-           aria-multiselectable="true"
+           role="dialog"
            aria-label="Filter by row type"
            hidden>
         <div class="browse-status-picker-actions">
@@ -34,7 +33,7 @@
           <li>
             <label class="browse-status-picker-row">
               <input type="checkbox" class="compare-category-checkbox" value="matched">
-              <span class="browse-status-picker-row-label">Paired (matched)</span>
+              <span class="browse-status-picker-row-label">Paired jobs</span>
             </label>
           </li>
           <li>

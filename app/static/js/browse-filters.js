@@ -70,21 +70,6 @@
     return document.getElementById('browse-status-picker-trigger');
   }
 
-  function positionPopover() {
-    var trigger = getTrigger();
-    var popover = getPopover();
-    if (!trigger || !popover || popover.hidden) {
-      return;
-    }
-    var rect = trigger.getBoundingClientRect();
-    var width = Math.max(rect.width, 240);
-    popover.style.position = 'fixed';
-    popover.style.top = Math.round(rect.bottom + 4) + 'px';
-    popover.style.left = Math.round(rect.left) + 'px';
-    popover.style.width = Math.round(width) + 'px';
-    popover.style.zIndex = '200';
-  }
-
   function setPopoverOpen(open) {
     var trigger = getTrigger();
     var popover = getPopover();
@@ -94,7 +79,6 @@
     if (open) {
       popover.removeAttribute('hidden');
       trigger.setAttribute('aria-expanded', 'true');
-      positionPopover();
     } else {
       popover.setAttribute('hidden', '');
       trigger.setAttribute('aria-expanded', 'false');
@@ -120,8 +104,6 @@
     }
     pickerListenersBound = true;
 
-    window.addEventListener('resize', positionPopover);
-    window.addEventListener('scroll', positionPopover, true);
 
     document.addEventListener('click', function (e) {
       var picker = document.getElementById('browse-filter-status');

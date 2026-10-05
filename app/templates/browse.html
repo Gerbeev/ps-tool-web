@@ -3,6 +3,11 @@
 {% block title %}Select environment — ps-tool-web{% endblock %}
 {% block content %}
 <section class="box-page">
+  <header class="page-heading">
+    <p class="page-eyebrow">Scheduler workspace</p>
+    <h1>Browse jobs</h1>
+    <p class="box-lead">Explore your topology, filter runs and inspect job details.</p>
+  </header>
   <div id="browse-env-panel" class="browse-env-panel box">
     <div class="browse-env-panel-header box__section box__pad">
       <button type="button"
@@ -14,7 +19,7 @@
         <span class="browse-env-chevron" aria-hidden="true"></span>
       </button>
       <div class="browse-env-panel-heading">
-        <h1>Select environment</h1>
+        <h2>Select environment</h2>
         <p id="browse-env-summary" class="browse-env-summary muted"></p>
       </div>
       <div class="browse-env-panel-actions">
@@ -26,6 +31,7 @@
       <form id="browse-form"
             class="browse-env-form"
             hx-post="/api/browse/load"
+            hx-disabled-elt="button[form='browse-form']"
             hx-target="#browse-output"
             hx-indicator="#browse-spinner-header">
         <label class="box-field-stack">
@@ -34,7 +40,7 @@
                   hx-get="/api/browse/form"
                   hx-trigger="change"
                   hx-target="#browse-context-fields"
-                  hx-include="#browse-env, #browse-as-of, #browse-topology, #browse-scheduler">
+                  hx-include="#browse-env, #browse-as-of, #browse-topology">
             {% for env in environments %}
             <option value="{{ env.id }}" {% if env.id == environment_id %}selected{% endif %}>{{ env.display_name }}</option>
             {% endfor %}
@@ -48,7 +54,12 @@
   </div>
 
   <div id="browse-output" class="box box-output">
-    <p class="box__pad muted box-output-placeholder">Select context and click Load tree.</p>
+    {% from 'macros/lucide_icons.html' import browse_icon %}
+    <div class="empty-state">
+      <span class="empty-state-icon" aria-hidden="true">{{ browse_icon() }}</span>
+      <h2>Your topology starts here</h2>
+      <p class="box-output-placeholder">Select an environment and click Load tree to explore its jobs.</p>
+    </div>
   </div>
 </section>
 <script src="/static/js/browse-env-panel.js"></script>

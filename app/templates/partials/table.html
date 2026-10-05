@@ -1,6 +1,7 @@
 <p id="compare-table-meta" class="muted small compare-table-meta" aria-live="polite"></p>
 
-<table role="grid" class="compare-table">
+<div class="table-scroll" tabindex="0" role="region" aria-label="Comparison results table">
+<table class="compare-table">
   <thead>
     <tr>
       <th>Match</th>
@@ -26,7 +27,7 @@
     {% if status_match and not param_delta %}
       {% set compare_tags = 'pair matched' %}
     {% else %}
-      {% set compare_tags = 'pair mismatch' %}
+      {% set compare_tags = 'pair matched mismatch' %}
       {% if pair.left and pair.right and pair.left.status != pair.right.status %}
         {% set compare_tags = compare_tags ~ ' status_delta' %}
       {% endif %}
@@ -78,3 +79,4 @@
     {% endfor %}
   </tbody>
 </table>
+</div>
