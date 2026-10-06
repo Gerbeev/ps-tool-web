@@ -1,12 +1,30 @@
+# Python build artifacts and local tooling
 __pycache__/
 *.py[cod]
 *.egg-info/
 .venv/
 venv/
-.env
-data/
-*.db
 .pytest_cache/
 .coverage
 htmlcov/
 .DS_Store
+
+# Local secrets / machine-specific settings.
+# .env.example is versioned and setup-env.cmd creates .env from it.
+.env
+
+# Generated runtime state. Never commit potentially sensitive snapshots.
+/data/runtime/
+/data/search.db
+/data/search.db-shm
+/data/search.db-wal
+/data/search.db-journal
+
+# IMPORTANT: Do NOT ignore data/ or data/mock/.
+# data/mock/reference_topology_2500.jsonl and
+# data/mock/u1_to_u5_migration_overlay.jsonl are required for a fresh
+# clone to run in mock mode; data/ui-browse-preview.jpg is a project asset.
+
+# Standalone log analyzer outputs may include source error text / internal paths.
+/tools/log_analyzer/output/
+/tools/log_analyzer/config.local.json

@@ -1,9 +1,41 @@
 # ps-tool-web
 
 
+## Standalone log analyzer
+
+`tools/log_analyzer/` contains an independent Python CLI to recursively parse environment-specific job logs into CSV, including execution duration, restarts, WARN/ERROR counts, and the last error line. On Windows, double-click `tools/log_analyzer/1-setup.cmd` and then `tools/log_analyzer/2-start.cmd` for the interactive console menu (`1` select environment, `9` Settings, `0` Exit). Per-machine paths are saved to ignored `config.local.json`, leaving `config.json` as the portable template. See [tools/log_analyzer/README.md](tools/log_analyzer/README.md). No web-app startup or adapter connection is required.
+
 ## Canonical 2,500-job mock dataset
 
 Until real scheduler endpoint adapters are wired, local mock mode uses one healthy environment-neutral reference file: `data/mock/reference_topology_2500.jsonl`. It contains exactly 2,500 hierarchical jobs across 25 synthetic four-digit business groups. AutoSys U1 is the default healthy reference projection. Process Scheduler U5 is materialized from the same source and receives a deterministic migration-problem overlay from `data/mock/u1_to_u5_migration_overlay.jsonl` (missing, failed, long-running, activated/waiting, on-ice/cancelled, slow-success execution-time regressions, timing and selected definition/dependency drift). Only AutoSys U1 and Process Scheduler U5 are enabled by default for Browse/Compare. See `docs/mock-reference-data.md`.
+
+## Portable Git checkout (mock mode)
+
+The committed project must include `data/mock/reference_topology_2500.jsonl`,
+`data/mock/u1_to_u5_migration_overlay.jsonl`, all of `config/`, `examples/`,
+`app/static/`, `app/templates/`, `.env.example`, and the Windows startup scripts.
+The root `.gitignore` **does not ignore `data/`**; only generated state under
+`data/runtime/` and the local `data/search.db*` SQLite index is ignored.
+
+After cloning on another machine, run `setup-env.cmd`, then `start-server.cmd`
+(or install `requirements.txt`, copy `.env.example` to `.env`, and launch Uvicorn).
+The mock dataset is available immediately, with no generation or download step.
+Keep `.env`, local DB indexes, and captured scheduler snapshots out of Git.
+
+**When committing to an existing repository**, stage **all project code as well as
+fixtures**. In particular `app/time_utils.py` is required by `app/models.py`; a checkout
+missing that file fails with `ModuleNotFoundError: No module named 'app.time_utils'`.
+The previous ZIP already included it, but it must also be committed to Git:
+
+```bash
+git add -A
+git status --short
+git ls-files --cached app/time_utils.py data/mock/reference_topology_2500.jsonl data/mock/u1_to_u5_migration_overlay.jsonl
+git commit -m "Make project portable with complete mock assets and Python bootstrap"
+```
+
+Check the staged list before committing, particularly if you have local changes.
+Do not commit `.env` or runtime snapshots; both remain ignored.
 
 ## Quick Start on Windows
 
@@ -14,7 +46,23 @@ setup-env.cmd
 start-server.cmd
 ```
 
-`setup-env.cmd` creates `.venv`, installs dependencies, and creates `.env` from `.env.example` when needed. It normally needs to be run only once.
+`setup-env.cmd` uses `python` first (Python 3.11+), falling back to `py -3` only
+when needed. The Windows `py` launcher is **not required**. It creates `.venv`,
+installs dependencies and creates `.env` from `.env.example` when needed.
+The installer and server run a checkout/import preflight that detects missing
+modules such as `app/time_utils.py`, templates, config files and mock fixtures.
+
+To verify a checkout manually before installing dependencies:
+
+```cmd
+python -m scripts.verify_checkout --source
+```
+
+After installing dependencies:
+
+```cmd
+.venv\Scripts\python.exe -m scripts.verify_checkout --runtime
+```
 
 `start-server.cmd` starts the server. If this application's Uvicorn server is already listening on the configured port, the script stops it and starts a fresh instance. If another application owns the port, the script refuses to terminate it and exits with an error.
 

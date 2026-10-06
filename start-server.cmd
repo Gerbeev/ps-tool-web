@@ -26,6 +26,12 @@ if not exist ".venv\Scripts\python.exe" (
   exit /b 1
 )
 
+".venv\Scripts\python.exe" -m scripts.verify_checkout --runtime
+if errorlevel 1 (
+  echo ERROR: Project files or imports are incomplete. Run setup-env.cmd after restoring missing files.
+  exit /b 1
+)
+
 set "PS_TOOL_CMD_PORT=%PORT%"
 echo [ps-tool-web] Checking port %PORT% ...
 powershell -NoProfile -ExecutionPolicy Bypass -Command ^
