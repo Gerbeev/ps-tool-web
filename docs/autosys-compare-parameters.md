@@ -53,7 +53,7 @@ Default runtime fields:
 - `actual_start`
 - `actual_end`
 
-`actual_start` and `actual_end` use `timing_threshold_sec` (60 seconds by default).
+`actual_start` and `actual_end` use `timing_threshold_sec` (60 seconds by default). Completed-job execution time is derived separately as `actual_end - actual_start`; `execution_time_threshold_sec` (300 seconds by default) controls when the signed right-minus-left duration delta is classified as an execution-time mismatch.
 
 ## Exit-code policy
 

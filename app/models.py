@@ -11,6 +11,7 @@ from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app.autosys_reference import AutoSysJobReference
 from app.process_scheduler_reference import ProcessSchedulerJobReference
+from app.time_utils import execution_time_seconds, format_duration_hms
 
 
 class SchedulerType(str, Enum):
@@ -177,6 +178,17 @@ class SnapshotJob(BaseModel):
     def end_time(self) -> datetime | None:
         return self.actual_end
 
+    @property
+    def execution_time_sec(self) -> float | None:
+        """Canonical execution time derived from actual end minus actual start."""
+        return execution_time_seconds(self.actual_start, self.actual_end)
+
+    @property
+    def exec_time(self) -> str | None:
+        """Human-readable execution time (HH:MM:SS)."""
+        seconds = self.execution_time_sec
+        return format_duration_hms(seconds) if seconds is not None else None
+
 
 class DependencyEdge(BaseModel):
     from_uid: str
@@ -207,6 +219,22 @@ class JobPair(BaseModel):
     match_kind: MatchConfidence = MatchConfidence.UNMATCHED
     confidence: MatchConfidence = MatchConfidence.UNMATCHED
     logical_id: str | None = None
+
+    @property
+    def execution_time_delta_sec(self) -> float | None:
+        """Signed execution-time delta: right minus left; positive means right is slower."""
+        if not self.left or not self.right:
+            return None
+        left_sec = self.left.execution_time_sec
+        right_sec = self.right.execution_time_sec
+        if left_sec is None or right_sec is None:
+            return None
+        return right_sec - left_sec
+
+    @property
+    def execution_time_delta(self) -> str | None:
+        delta = self.execution_time_delta_sec
+        return format_duration_hms(delta, signed=True) if delta is not None else None
 
 
 class ParameterMismatch(BaseModel):
@@ -268,6 +296,7 @@ class ComparisonSummary(BaseModel):
     mismatched_parameters: int = 0
     parameter_mismatch_counts: dict[str, int] = Field(default_factory=dict)
     mismatched_timing: int = 0
+    mismatched_execution_time: int = 0
     left_only_count: int = 0
     right_only_count: int = 0
     not_comparable_parameters: int = 0
@@ -283,6 +312,7 @@ class ComparisonResult(BaseModel):
     right_only: list[SnapshotJob] = Field(default_factory=list)
     status_mismatches: list[JobPair] = Field(default_factory=list)
     timing_deltas: list[JobPair] = Field(default_factory=list)
+    execution_time_deltas: list[JobPair] = Field(default_factory=list)
     definition_mismatches: list[JobPair] = Field(default_factory=list)
     parameter_mismatches: list[ParameterMismatch] = Field(default_factory=list)
     not_comparable: list[NotComparableParameter] = Field(default_factory=list)

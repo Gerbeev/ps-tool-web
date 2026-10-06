@@ -75,11 +75,13 @@
       if (preset === 'all') {
         box.checked = false;
       } else if (preset === 'mismatches') {
-        box.checked = ['status_delta', 'left_only', 'right_only', 'param_delta'].indexOf(box.value) !== -1;
+        box.checked = ['status_delta', 'left_only', 'right_only', 'param_delta', 'exec_time_delta'].indexOf(box.value) !== -1;
       } else if (preset === 'matched') {
         box.checked = box.value === 'matched';
       } else if (preset === 'status_delta') {
         box.checked = box.value === 'status_delta';
+      } else if (preset === 'exec_time_delta') {
+        box.checked = box.value === 'exec_time_delta';
       } else if (preset === 'left_only') {
         box.checked = box.value === 'left_only';
       } else if (preset === 'right_only') {
@@ -200,7 +202,7 @@
       if (!empty) {
         empty = document.createElement('tr');
         empty.className = 'compare-filter-empty';
-        empty.innerHTML = '<td colspan="8" class="muted box__pad">No rows match the current filters.</td>';
+        empty.innerHTML = '<td colspan="11" class="muted box__pad">No rows match the current filters.</td>';
         body.appendChild(empty);
       }
       empty.removeAttribute('hidden');

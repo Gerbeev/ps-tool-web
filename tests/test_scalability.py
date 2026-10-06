@@ -81,6 +81,9 @@ def test_compare_table_endpoint_all_by_default():
     table = client.get(f"/api/compare/table?session_id={sid}&filter=all&limit=0")
     assert table.status_code == 200
     assert "compare-table" in table.text
+    assert "Left Exec Time" in table.text
+    assert "Right Exec Time" in table.text
+    assert "Exec Δ (R−L)" in table.text
 
     bad_side = client.get(f"/api/tree/not-a-side?session_id={sid}")
     assert bad_side.status_code == 404

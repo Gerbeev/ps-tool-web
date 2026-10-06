@@ -8,23 +8,27 @@
       <th>Logical ID</th>
       <th>Left name</th>
       <th>Left status</th>
+      <th>Left Exec Time</th>
       <th>Right name</th>
       <th>Right status</th>
+      <th>Right Exec Time</th>
+      <th>Exec Δ (R−L)</th>
       <th>Parameter Δ</th>
       <th>Confidence</th>
     </tr>
   </thead>
   <tbody id="compare-table-body">
     {% if not rows %}
-    <tr><td colspan="8" class="muted">No rows in comparison.</td></tr>
+    <tr><td colspan="11" class="muted">No rows in comparison.</td></tr>
     {% endif %}
     {% for row in rows %}
     {% if row.kind == 'pair' and row.pair %}
     {% set pair = row.pair %}
     {% set param_delta = param_mismatches_by_id.get(pair.logical_id or '', []) if param_mismatches_by_id else [] %}
     {% set status_match = pair.left and pair.right and pair.left.status == pair.right.status %}
+    {% set exec_delta = pair.logical_id in execution_time_mismatch_ids if execution_time_mismatch_ids and pair.logical_id else false %}
     {% set search_blob = ((pair.logical_id or '') ~ ' ' ~ (pair.left.scheduler_job_name if pair.left else '') ~ ' ' ~ (pair.right.scheduler_job_name if pair.right else '')) | lower %}
-    {% if status_match and not param_delta %}
+    {% if status_match and not param_delta and not exec_delta %}
       {% set compare_tags = 'pair matched' %}
     {% else %}
       {% set compare_tags = 'pair matched mismatch' %}
@@ -34,16 +38,22 @@
       {% if param_delta %}
         {% set compare_tags = compare_tags ~ ' param_delta' %}
       {% endif %}
+      {% if exec_delta %}
+        {% set compare_tags = compare_tags ~ ' exec_time_delta' %}
+      {% endif %}
     {% endif %}
-    <tr class="{% if not status_match or param_delta %}row-mismatch{% endif %}"
+    <tr class="{% if not status_match or param_delta or exec_delta %}row-mismatch{% endif %}"
         data-compare-search="{{ search_blob }}"
         data-compare-tags="{{ compare_tags }}">
-      <td>{% if status_match and not param_delta %}ok{% else %}Δ{% endif %}</td>
+      <td>{% if status_match and not param_delta and not exec_delta %}ok{% else %}Δ{% endif %}</td>
       <td><code>{{ pair.logical_id or '—' }}</code></td>
       <td>{{ pair.left.scheduler_job_name if pair.left else '—' }}</td>
       <td><span class="{{ job_status_css(pair.left.status) if pair.left else '' }}">{{ pair.left.status.value if pair.left else '—' }}</span></td>
+      <td><code>{{ pair.left.exec_time if pair.left and pair.left.exec_time else '—' }}</code></td>
       <td>{{ pair.right.scheduler_job_name if pair.right else '—' }}</td>
       <td><span class="{{ job_status_css(pair.right.status) if pair.right else '' }}">{{ pair.right.status.value if pair.right else '—' }}</span></td>
+      <td><code>{{ pair.right.exec_time if pair.right and pair.right.exec_time else '—' }}</code></td>
+      <td class="{% if exec_delta %}exec-time-delta{% endif %}"><code>{{ pair.execution_time_delta if pair.execution_time_delta else '—' }}</code></td>
       <td class="param-delta">{% if param_delta %}<ul class="param-mismatch-list">{% for m in param_delta %}<li><code>{{ m.parameter }}</code></li>{% endfor %}</ul>{% else %}—{% endif %}</td>
       <td>{{ pair.confidence.value }}</td>
     </tr>
@@ -56,6 +66,9 @@
       <td><code>{{ row.logical_id or row.job.scheduler_job_name }}</code></td>
       <td>{{ row.job.scheduler_job_name }}</td>
       <td class="{{ job_status_css(row.job.status) }}">{{ row.job.status.value }}</td>
+      <td><code>{{ row.job.exec_time or '—' }}</code></td>
+      <td>—</td>
+      <td>—</td>
       <td>—</td>
       <td>—</td>
       <td>—</td>
@@ -70,8 +83,11 @@
       <td><code>{{ row.logical_id or row.job.scheduler_job_name }}</code></td>
       <td>—</td>
       <td>—</td>
+      <td>—</td>
       <td>{{ row.job.scheduler_job_name }}</td>
       <td class="{{ job_status_css(row.job.status) }}">{{ row.job.status.value }}</td>
+      <td><code>{{ row.job.exec_time or '—' }}</code></td>
+      <td>—</td>
       <td>—</td>
       <td>{{ row.job.logical_id and 'mapped' or 'name_only' }}</td>
     </tr>

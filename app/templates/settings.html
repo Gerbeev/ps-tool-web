@@ -31,26 +31,29 @@
     <div class="box__section box__pad settings-panel-header">
       <div>
         <h2>Process Scheduler environments</h2>
-        <p class="muted box-lead">Environment catalog captured from <code>ps-tool Browse v1.0.0</code>. WCF host values are preserved exactly as observed.</p>
+        <p class="muted box-lead">Environment, WCF host and operator description. Display labels are generated automatically from these values.</p>
       </div>
-      <div class="settings-config-path"><code>{{ process_scheduler_config_path }}</code></div>
     </div>
     {% if saved == 'process_scheduler' %}
     <div class="box__section box__pad"><p class="box-saved" role="status">Process Scheduler settings saved.</p></div>
     {% endif %}
-    <form method="post" action="/api/settings/environments/process_scheduler">
+    <form method="post" action="/api/settings/environments/process_scheduler" data-settings-env-form="process_scheduler">
       <div class="box__section box__pad">
-        <div class="table-scroll" tabindex="0" role="region" aria-label="Process Scheduler environment settings table">
+        <div class="table-scroll settings-table-scroll" tabindex="0" role="region" aria-label="Process Scheduler environment settings table">
           <table class="box-data-table settings-connections-table">
             <thead>
               <tr>
                 <th>Environment</th>
                 <th>Host</th>
                 <th>Description</th>
-                <th>Display name</th>
-                <th>Transport</th>
-                <th>Connector profile</th>
-                <th>Enabled</th>
+                <th class="settings-enabled-header">
+                  <label class="settings-bulk-toggle" title="Enable or disable all Process Scheduler environments">
+                    <input type="checkbox" data-settings-toggle-all="process_scheduler"
+                           aria-label="Enable or disable all Process Scheduler environments"
+                           {% if not allow_connection_config_edit %}disabled{% endif %}>
+                    <span>Enabled</span>
+                  </label>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -60,7 +63,6 @@
                   <input type="text" name="environment_{{ env.id }}" class="app-control settings-env-code"
                          value="{{ env.environment }}" aria-label="Environment code for {{ env.display_name }}"
                          {% if not allow_connection_config_edit %}readonly{% endif %}>
-                  {% if env.source %}<span class="settings-cell-meta">{{ env.source }}</span>{% endif %}
                 </td>
                 <td>
                   <input type="text" name="host_{{ env.id }}" class="app-control settings-host"
@@ -68,29 +70,13 @@
                          {% if not allow_connection_config_edit %}readonly{% endif %}>
                 </td>
                 <td>
-                  <input type="text" name="description_{{ env.id }}" class="app-control"
+                  <input type="text" name="description_{{ env.id }}" class="app-control settings-description"
                          value="{{ env.description }}" aria-label="Description for {{ env.display_name }}"
-                         {% if not allow_connection_config_edit %}readonly{% endif %}>
-                  <input type="hidden" name="notes_{{ env.id }}" value="{{ env.notes }}">
-                </td>
-                <td>
-                  <input type="text" name="display_name_{{ env.id }}" class="app-control"
-                         value="{{ env.display_name }}" aria-label="Display name for {{ env.display_name }}"
-                         {% if not allow_connection_config_edit %}readonly{% endif %}>
-                </td>
-                <td>
-                  <input type="text" name="transport_{{ env.id }}" class="app-control settings-transport"
-                         value="{{ env.transport }}" aria-label="Transport for {{ env.display_name }}"
-                         {% if not allow_connection_config_edit %}readonly{% endif %}>
-                </td>
-                <td>
-                  <input type="text" name="connector_profile_{{ env.id }}" class="app-control"
-                         value="{{ env.connector_profile or '' }}" placeholder="Not wired yet"
-                         aria-label="Connector profile for {{ env.display_name }}"
                          {% if not allow_connection_config_edit %}readonly{% endif %}>
                 </td>
                 <td class="settings-enabled-cell">
-                  <input type="checkbox" name="enabled_{{ env.id }}" {% if env.enabled %}checked{% endif %}
+                  <input type="checkbox" name="enabled_{{ env.id }}" data-settings-enabled-row
+                         {% if env.enabled %}checked{% endif %}
                          aria-label="Enable {{ env.display_name }}" {% if not allow_connection_config_edit %}disabled{% endif %}>
                 </td>
               </tr>
@@ -111,26 +97,29 @@
     <div class="box__section box__pad settings-panel-header">
       <div>
         <h2>AutoSys environments</h2>
-        <p class="muted box-lead">Only values observed in the supplied AutoSys reference are populated. The captured self-help host is not treated as the future adapter API contract.</p>
+        <p class="muted box-lead">Environment, host and operator description. The captured self-help host is reference data, not a declared adapter API contract.</p>
       </div>
-      <div class="settings-config-path"><code>{{ autosys_config_path }}</code></div>
     </div>
     {% if saved == 'autosys' %}
     <div class="box__section box__pad"><p class="box-saved" role="status">AutoSys settings saved.</p></div>
     {% endif %}
-    <form method="post" action="/api/settings/environments/autosys">
+    <form method="post" action="/api/settings/environments/autosys" data-settings-env-form="autosys">
       <div class="box__section box__pad">
-        <div class="table-scroll" tabindex="0" role="region" aria-label="AutoSys environment settings table">
+        <div class="table-scroll settings-table-scroll" tabindex="0" role="region" aria-label="AutoSys environment settings table">
           <table class="box-data-table settings-connections-table">
             <thead>
               <tr>
                 <th>Environment</th>
                 <th>Host</th>
                 <th>Description</th>
-                <th>Display name</th>
-                <th>Transport</th>
-                <th>Connector profile</th>
-                <th>Enabled</th>
+                <th class="settings-enabled-header">
+                  <label class="settings-bulk-toggle" title="Enable or disable all AutoSys environments">
+                    <input type="checkbox" data-settings-toggle-all="autosys"
+                           aria-label="Enable or disable all AutoSys environments"
+                           {% if not allow_connection_config_edit %}disabled{% endif %}>
+                    <span>Enabled</span>
+                  </label>
+                </th>
               </tr>
             </thead>
             <tbody>
@@ -140,7 +129,6 @@
                   <input type="text" name="environment_{{ env.id }}" class="app-control settings-env-code"
                          value="{{ env.environment }}" aria-label="Environment code for {{ env.display_name }}"
                          {% if not allow_connection_config_edit %}readonly{% endif %}>
-                  {% if env.source %}<span class="settings-cell-meta">{{ env.source }}</span>{% endif %}
                 </td>
                 <td>
                   <input type="text" name="host_{{ env.id }}" class="app-control settings-host"
@@ -148,30 +136,13 @@
                          {% if not allow_connection_config_edit %}readonly{% endif %}>
                 </td>
                 <td>
-                  <input type="text" name="description_{{ env.id }}" class="app-control"
+                  <input type="text" name="description_{{ env.id }}" class="app-control settings-description"
                          value="{{ env.description }}" aria-label="Description for {{ env.display_name }}"
-                         {% if not allow_connection_config_edit %}readonly{% endif %}>
-                  <textarea name="notes_{{ env.id }}" class="settings-notes" aria-label="Notes for {{ env.display_name }}"
-                            {% if not allow_connection_config_edit %}readonly{% endif %}>{{ env.notes }}</textarea>
-                </td>
-                <td>
-                  <input type="text" name="display_name_{{ env.id }}" class="app-control"
-                         value="{{ env.display_name }}" aria-label="Display name for {{ env.display_name }}"
-                         {% if not allow_connection_config_edit %}readonly{% endif %}>
-                </td>
-                <td>
-                  <input type="text" name="transport_{{ env.id }}" class="app-control settings-transport"
-                         value="{{ env.transport }}" aria-label="Transport for {{ env.display_name }}"
-                         {% if not allow_connection_config_edit %}readonly{% endif %}>
-                </td>
-                <td>
-                  <input type="text" name="connector_profile_{{ env.id }}" class="app-control"
-                         value="{{ env.connector_profile or '' }}" placeholder="Not wired yet"
-                         aria-label="Connector profile for {{ env.display_name }}"
                          {% if not allow_connection_config_edit %}readonly{% endif %}>
                 </td>
                 <td class="settings-enabled-cell">
-                  <input type="checkbox" name="enabled_{{ env.id }}" {% if env.enabled %}checked{% endif %}
+                  <input type="checkbox" name="enabled_{{ env.id }}" data-settings-enabled-row
+                         {% if env.enabled %}checked{% endif %}
                          aria-label="Enable {{ env.display_name }}" {% if not allow_connection_config_edit %}disabled{% endif %}>
                 </td>
               </tr>
@@ -236,6 +207,27 @@
 
   tabs.forEach(function (tab) {
     tab.addEventListener('click', function () { activate(tab.dataset.settingsTab, true); });
+  });
+
+  document.querySelectorAll('[data-settings-env-form]').forEach(function (form) {
+    var toggleAll = form.querySelector('[data-settings-toggle-all]');
+    var rows = Array.prototype.slice.call(form.querySelectorAll('[data-settings-enabled-row]'));
+    if (!toggleAll || !rows.length) return;
+
+    function syncToggleAll() {
+      var enabledCount = rows.filter(function (row) { return row.checked; }).length;
+      toggleAll.checked = enabledCount === rows.length;
+      toggleAll.indeterminate = enabledCount > 0 && enabledCount < rows.length;
+    }
+
+    toggleAll.addEventListener('change', function () {
+      rows.forEach(function (row) {
+        if (!row.disabled) row.checked = toggleAll.checked;
+      });
+      syncToggleAll();
+    });
+    rows.forEach(function (row) { row.addEventListener('change', syncToggleAll); });
+    syncToggleAll();
   });
 
   var requested = window.location.hash.replace('#', '');

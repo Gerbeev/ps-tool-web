@@ -9,9 +9,10 @@ os.environ.setdefault("MOCK_DATASET", "legacy_small")
 
 
 @pytest.fixture(autouse=True)
-def _reset_cached_settings():
+def _reset_cached_settings(monkeypatch, tmp_path):
     from app.config import get_settings
 
+    monkeypatch.setenv("CURRENT_SNAPSHOT_DIR", str(tmp_path / "current-snapshot"))
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

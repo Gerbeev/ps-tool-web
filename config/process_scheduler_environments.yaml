@@ -1,130 +1,75 @@
-# Process Scheduler environment connections captured from ps-tool Browse v1.0.0.
-# WCF addresses are preserved exactly as observed. Secrets/credentials do not belong here.
+# Process Scheduler environment connections.
+# Operator-editable fields: environment, host, description, enabled.
+# Display names are derived dynamically. Secrets/credentials do not belong here.
 scheduler: process_scheduler
 environments:
 - id: ps-bb
   environment: BB
   host: np12971565bbp1.ubscloud-prod.msad.ubs.net:9001
   description: Main Prod
-  display_name: BB (Main Prod)
-  transport: WCF
-  connector_profile: ''
-  enabled: true
-  source: ps-tool Browse v1.0.0 reference capture
+  enabled: false
 - id: ps-dv
   environment: DV
   host: nd29201564dvp1.ubscloud-prod.msad.ubs.net:9001
   description: PSO env DEV
-  display_name: DV (PSO env DEV)
-  transport: WCF
-  connector_profile: ''
-  enabled: true
-  source: ps-tool Browse v1.0.0 reference capture
+  enabled: false
 - id: ps-dz
   environment: DZ
   host: nd29201564dzp1.ubscloud-prod.msad.ubs.net:9001
   description: Quantum env DEV
-  display_name: DZ (Quantum env DEV)
-  transport: WCF
-  connector_profile: ''
-  enabled: true
-  source: ps-tool Browse v1.0.0 reference capture
+  enabled: false
 - id: ps-p1
   environment: P1
   host: np3e791565p1p1.ubscloud-prod.msad.ubs.net:9001
   description: Cloud Data Sourcing Prod
-  display_name: P1 (Cloud Data Sourcing Prod)
-  transport: WCF
-  connector_profile: ''
-  enabled: true
-  source: ps-tool Browse v1.0.0 reference capture
+  enabled: false
 - id: ps-pa
   environment: PA
   host: np3e791565pap2.ubscloud-prod.msad.ubs.net:9001
   description: Secondary Prod
-  display_name: PA (Secondary Prod)
-  transport: WCF
-  connector_profile: ''
-  enabled: true
-  source: ps-tool Browse v1.0.0 reference capture
+  enabled: false
 - id: ps-pb
   environment: PB
   host: np3e791565pbp1.ubscloud-prod.msad.ubs.net:9001
   description: to be decommissioned
-  display_name: PB (to be decommissioned)
-  transport: WCF
-  connector_profile: ''
-  enabled: true
-  source: ps-tool Browse v1.0.0 reference capture
+  enabled: false
 - id: ps-py
   environment: PY
   host: np3e791565pyp1.ubscloud-prod.msad.ubs.net:9001
   description: Pillar 2 Prod
-  display_name: PY (Pillar 2 Prod)
-  transport: WCF
-  connector_profile: ''
-  enabled: true
-  source: ps-tool Browse v1.0.0 reference capture
+  enabled: false
 - id: ps-u1
   environment: U1
   host: npb14716831u1p1.ubscloud-prod.msad.ubs.net:9001
   description: Cloud Data Sourcing UAT
-  display_name: U1 (Cloud Data Sourcing UAT)
-  transport: WCF
-  connector_profile: ''
-  enabled: true
-  source: ps-tool Browse v1.0.0 reference capture
+  enabled: false
 - id: ps-u5
   environment: U5
   host: npb14716831u5p1.ubscloud-prod.msad.ubs.net:9001
   description: UAT
-  display_name: U5 (UAT)
-  transport: WCF
-  connector_profile: ''
   enabled: true
-  source: ps-tool Browse v1.0.0 reference capture
 - id: ps-uw
   environment: UW
   host: np405216831uwp1.ubscloud-prod.msad.ubs.net:9001
   description: Main UAT Secondary
-  display_name: UW (Main UAT Secondary)
-  transport: WCF
-  connector_profile: ''
-  enabled: true
-  source: ps-tool Browse v1.0.0 reference capture
+  enabled: false
 - id: ps-ux
   environment: UX
   host: np405216831uxp1.ubscloud-prod.msad.ubs.net:9001
   description: Main UAT Primary
-  display_name: UX (Main UAT Primary)
-  transport: WCF
-  connector_profile: ''
-  enabled: true
-  source: ps-tool Browse v1.0.0 reference capture
+  enabled: false
 - id: ps-uz
   environment: UZ
   host: np405216831uzp2.ubscloud-prod.msad.ubs.net:9001
   description: Interactive UAT
-  display_name: UZ (Interactive UAT)
-  transport: WCF
-  connector_profile: ''
-  enabled: true
-  source: ps-tool Browse v1.0.0 reference capture
+  enabled: false
 - id: ps-xy
   environment: XY
   host: nd29201564xyp1.ubscloud-prod.msad.ubs.net:9001
   description: PIE
-  display_name: XY (PIE)
-  transport: WCF
-  connector_profile: ''
-  enabled: true
-  source: ps-tool Browse v1.0.0 reference capture
+  enabled: false
 - id: ps-xz
   environment: XZ
   host: nd29201564xzp1.ubscloud-prod.msad.ubs.net:9001
   description: PIE
-  display_name: XZ (PIE)
-  transport: WCF
-  connector_profile: ''
-  enabled: true
-  source: ps-tool Browse v1.0.0 reference capture
+  enabled: false

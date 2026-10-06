@@ -7,7 +7,7 @@ from functools import lru_cache
 from pathlib import Path
 
 import yaml
-from pydantic import AliasChoices, BaseModel, Field
+from pydantic import AliasChoices, BaseModel, Field, model_validator
 
 
 def _repo_root() -> Path:
@@ -24,7 +24,7 @@ class EnvironmentEntry(BaseModel):
 
     id: str
     environment: str = ""
-    display_name: str
+    display_name: str = ""
     description: str = ""
     region: str | None = None
     connector_profile: str | None = None
@@ -37,6 +37,15 @@ class EnvironmentEntry(BaseModel):
     enabled: bool = True
     source: str = ""
     notes: str = ""
+
+    @model_validator(mode="after")
+    def derive_display_name(self) -> "EnvironmentEntry":
+        """Build the UI label from the minimal persisted environment fields."""
+        if not self.display_name.strip():
+            base = self.environment.strip() or self.id
+            description = self.description.strip()
+            self.display_name = f"{base} ({description})" if description else base
+        return self
 
     @property
     def host(self) -> str:
@@ -107,11 +116,14 @@ class AppSettings(BaseModel):
     data_dir: Path = Field(default_factory=lambda: _repo_root() / "data")
     snapshot_cache_ttl_sec: int = 180
     search_db_path: Path = Field(default_factory=lambda: _repo_root() / "data" / "search.db")
+    current_snapshot_dir: Path = Field(default_factory=lambda: _repo_root() / "data" / "runtime" / "current")
     use_mock_adapters: bool = True
     allow_connection_config_edit: bool = True
     mock_job_count: int = 0
     mock_dataset: str = "reference_2500"
     mock_reference_path: Path = Field(default_factory=lambda: _repo_root() / "data" / "mock" / "reference_topology_2500.jsonl")
+    mock_scenario: str = "u1_to_u5_migration"
+    mock_scenario_path: Path = Field(default_factory=lambda: _repo_root() / "data" / "mock" / "u1_to_u5_migration_overlay.jsonl")
     table_page_size_default: int = 0  # 0 = show all rows on first load
 
 
@@ -126,6 +138,9 @@ def get_settings() -> AppSettings:
         data_dir=Path(os.getenv("PS_TOOL_DATA_DIR", str(root / "data"))),
         snapshot_cache_ttl_sec=int(os.getenv("SNAPSHOT_CACHE_TTL_SEC", "180")),
         search_db_path=Path(os.getenv("SEARCH_DB_PATH", str(root / "data" / "search.db"))),
+        current_snapshot_dir=Path(
+            os.getenv("CURRENT_SNAPSHOT_DIR", str(root / "data" / "runtime" / "current"))
+        ),
         use_mock_adapters=os.getenv("USE_MOCK_ADAPTERS", "true").lower() in ("1", "true", "yes"),
         allow_connection_config_edit=os.getenv("ALLOW_CONNECTION_CONFIG_EDIT", "true").lower()
         in ("1", "true", "yes"),
@@ -135,6 +150,13 @@ def get_settings() -> AppSettings:
             os.getenv(
                 "MOCK_REFERENCE_PATH",
                 str(root / "data" / "mock" / "reference_topology_2500.jsonl"),
+            )
+        ),
+        mock_scenario=os.getenv("MOCK_SCENARIO", "u1_to_u5_migration").strip().lower(),
+        mock_scenario_path=Path(
+            os.getenv(
+                "MOCK_SCENARIO_PATH",
+                str(root / "data" / "mock" / "u1_to_u5_migration_overlay.jsonl"),
             )
         ),
         table_page_size_default=int(os.getenv("TABLE_PAGE_SIZE", "0")),
@@ -163,7 +185,9 @@ def _load_environment_file(path: Path, scheduler: str) -> list[EnvironmentEntry]
         payload = dict(raw)
         payload.setdefault("scheduler", scheduler)
         payload.setdefault("environment", payload.get("id", ""))
-        payload.setdefault("display_name", payload.get("environment") or payload.get("id", ""))
+        # Display labels are UI-derived from environment + description, even when
+        # loading an older config that persisted a redundant display_name field.
+        payload.pop("display_name", None)
         entries.append(EnvironmentEntry.model_validate(payload))
     return entries
 
@@ -233,23 +257,18 @@ def resolve_scheduler(entry: EnvironmentEntry):
 
 
 def _environment_to_yaml(entry: EnvironmentEntry) -> dict:
-    """Persist operator-facing keys in a stable, human-editable order."""
+    """Persist only operator-editable connection fields plus the stable technical id."""
     payload: dict[str, object] = {
         "id": entry.id,
         "environment": entry.environment,
         "host": entry.endpoint_url,
         "description": entry.description,
-        "display_name": entry.display_name,
-        "transport": entry.transport,
-        "connector_profile": entry.connector_profile or "",
         "enabled": entry.enabled,
     }
-    if entry.region:
-        payload["region"] = entry.region
-    if entry.source:
-        payload["source"] = entry.source
-    if entry.notes:
-        payload["notes"] = entry.notes
+    # Internal adapter selection is not an operator-facing table field, but preserve
+    # it when a bank deployment explicitly configures one.
+    if entry.connector_profile:
+        payload["connector_profile"] = entry.connector_profile
     return payload
 
 
@@ -262,7 +281,7 @@ def save_scheduler_environments(scheduler: str, entries: list[EnvironmentEntry])
     }
     header = (
         f"# {scheduler.replace('_', ' ').title()} environment connections.\n"
-        "# Editable from Settings; secrets/credentials must not be stored here.\n"
+        "# Editable from Settings. Display labels are derived dynamically; secrets/credentials must not be stored here.\n"
     )
     with path.open("w", encoding="utf-8") as f:
         f.write(header)

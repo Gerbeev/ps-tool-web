@@ -1,3 +1,7 @@
+<div class="box__section box__pad snapshot-result-meta">
+  <p class="small"><strong>{% if snapshot_origin == 'current' %}Reused current snapshot{% else %}Captured new snapshot{% endif %}</strong> · {{ snapshot_manifest.captured_at }}</p>
+  <p class="muted small">Left fetched {{ snapshot_manifest.left.fetched_at }} · Right fetched {{ snapshot_manifest.right.fetched_at }}. Browse, table, trees and exports below use these frozen snapshots.</p>
+</div>
 <div class="box__section box__pad">
   {% include "partials/summary.html" %}
 </div>

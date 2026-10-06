@@ -29,6 +29,7 @@ A captured full-detail response confirms the following wire fields. The adapter 
 | `Status` | normalized `status` + unchanged `status_raw` |
 | `LastStartTime` | `actual_start` / `autosys.run.actual_start` |
 | `LastFinishTime` | `actual_end` / `autosys.run.actual_end` |
+| derived `LastFinishTime - LastStartTime` | `SnapshotJob.exec_time` (`HH:MM:SS`) and execution-time comparison delta |
 | `JobType` | `autosys.jil.job_type` only through verified type mapping |
 | `Schedule` | `autosys.jil.days_of_week` when the value is a weekday schedule |
 | `StartAtTime` | `autosys.jil.start_times` when it represents the scheduled start time |
@@ -59,7 +60,7 @@ For Process Scheduler jobs, populate only fields that can be defended semantical
 - schedule/calendar/time-window semantics;
 - retry/timeout semantics;
 - file-watcher semantics;
-- runtime status, timings and exit code;
+- runtime status, start/end timestamps, derived execution time and exit code;
 - explicit predecessor dependencies.
 
 A Process Scheduler-native field with no AutoSys equivalent belongs in `attributes`; it should not be forced into an unrelated JIL field.

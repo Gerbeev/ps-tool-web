@@ -12,6 +12,15 @@
     <div class="box__section box__pad">
       <h2>Comparison context</h2>
       <p class="muted box-lead">Scheduler type per environment is set in <a href="/settings">Settings</a>.</p>
+      <div class="snapshot-status">
+        {% if current_snapshot_manifest %}
+        <p class="small"><strong>Current snapshot:</strong> {{ current_snapshot_manifest.captured_at }} · {{ current_snapshot_manifest.left.environment_id }} ({{ current_snapshot_manifest.left.job_count }} jobs) → {{ current_snapshot_manifest.right.environment_id }} ({{ current_snapshot_manifest.right.job_count }} jobs)</p>
+        <p class="muted small">Matching parameters reuse this snapshot without fetching. Changed parameters capture a new snapshot. Refresh forces both sources to be fetched again.</p>
+        {% else %}
+        <p class="small"><strong>Current snapshot:</strong> none</p>
+        <p class="muted small">The first comparison captures both sources and stores one current snapshot for subsequent analysis.</p>
+        {% endif %}
+      </div>
     </div>
     <div class="box__section box__pad">
       <form id="compare-form"
@@ -70,8 +79,9 @@
           </div>
         </div>
         <div class="box-form-actions">
-          <button type="submit">Compare</button>
-          <span id="compare-spinner" class="htmx-indicator" aria-live="polite">Loading…</span>
+          <button type="submit">Compare snapshot</button>
+          <button type="submit" name="refresh" value="true" class="outline">Refresh &amp; compare</button>
+          <span id="compare-spinner" class="htmx-indicator" aria-live="polite">Fetching / analyzing…</span>
         </div>
       </form>
     </div>

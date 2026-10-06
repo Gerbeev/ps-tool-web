@@ -58,6 +58,11 @@ def iter_table_rows(
         for mismatch in result.parameter_mismatches
         if mismatch.logical_id
     }
+    execution_time_mismatch_ids = {
+        pair.logical_id
+        for pair in result.execution_time_deltas
+        if pair.logical_id
+    }
 
     def name_matches(job: SnapshotJob | None) -> bool:
         if not prefix or not job:
@@ -74,7 +79,12 @@ def iter_table_rows(
                 continue
             if filter_name == "mismatches" and pair.left and pair.right:
                 has_param_delta = pair.logical_id in parameter_mismatch_ids
-                if pair.left.status == pair.right.status and not has_param_delta:
+                has_exec_delta = pair.logical_id in execution_time_mismatch_ids
+                if (
+                    pair.left.status == pair.right.status
+                    and not has_param_delta
+                    and not has_exec_delta
+                ):
                     continue
             if not name_matches(pair.left) and not name_matches(pair.right):
                 continue

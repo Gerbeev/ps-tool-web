@@ -11,6 +11,12 @@
       <span class="card-value">{{ result.summary.mismatched_status }}</span>
     </span>
   </button>
+  <button type="button" class="box box--inset summary-card" aria-pressed="false" data-compare-preset="exec_time_delta">
+    <span class="box__pad">
+      <span class="summary-card__title">Exec Time Δ</span>
+      <span class="card-value">{{ result.summary.mismatched_execution_time }}</span>
+    </span>
+  </button>
   <button type="button" class="box box--inset summary-card" aria-pressed="false" data-compare-preset="left_only">
     <span class="box__pad">
       <span class="summary-card__title">Left only</span>
@@ -27,6 +33,8 @@
 <p class="muted small box-note box-note--after">
   Left jobs: {{ result.summary.total_left }} · Right jobs: {{ result.summary.total_right }}
   · Parameter diffs: {{ result.summary.mismatched_parameters }}
+  · Timing diffs: {{ result.summary.mismatched_timing }}
+  · Exec time diffs: {{ result.summary.mismatched_execution_time }}
   · Not comparable: {{ result.summary.not_comparable_parameters }}
   · Identity conflicts: {{ result.summary.identity_conflicts }}
   · Snapshots {{ result.left_snapshot_id[:8] }} / {{ result.right_snapshot_id[:8] }}

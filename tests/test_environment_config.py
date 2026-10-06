@@ -30,7 +30,7 @@ def test_process_scheduler_catalog_matches_reference_capture():
     u5 = next(e for e in envs if e.environment == "U5")
     assert u5.host == "npb14716831u5p1.ubscloud-prod.msad.ubs.net:9001"
     assert u5.description == "UAT"
-    assert u5.transport == "WCF"
+    assert u5.display_name == "U5 (UAT)"
 
 
 def test_compare_side_form_loads_topology_for_ps():
@@ -101,3 +101,56 @@ def test_settings_has_separate_scheduler_tabs_and_hosts():
     assert 'data-settings-tab="autosys"' in resp.text
     assert "npb14716831u5p1.ubscloud-prod.msad.ubs.net:9001" in resp.text
     assert "autosys.ldn.swissbank.com" in resp.text
+    assert resp.text.count("<th>Environment</th>") == 2
+    assert resp.text.count("<th>Host</th>") == 2
+    assert resp.text.count("<th>Description</th>") == 2
+    assert 'data-settings-toggle-all="process_scheduler"' in resp.text
+    assert 'data-settings-toggle-all="autosys"' in resp.text
+    assert "<th>Display name</th>" not in resp.text
+    assert "<th>Transport</th>" not in resp.text
+    assert "<th>Connector profile</th>" not in resp.text
+    assert 'name="display_name_' not in resp.text
+    assert 'name="transport_' not in resp.text
+    assert 'name="connector_profile_' not in resp.text
+
+
+def test_environment_yaml_uses_minimal_operator_fields():
+    import yaml
+
+    from app.config import scheduler_config_path
+
+    for scheduler in ("process_scheduler", "autosys"):
+        data = yaml.safe_load(scheduler_config_path(scheduler).read_text(encoding="utf-8"))
+        for row in data["environments"]:
+            assert set(row) == {"id", "environment", "host", "description", "enabled"}
+            assert "display_name" not in row
+
+
+def test_display_name_is_derived_from_environment_and_description():
+    entry = EnvironmentEntry(id="ps-aa", environment="AA", description="Example", scheduler="process_scheduler")
+    assert entry.display_name == "AA (Example)"
+
+    no_description = EnvironmentEntry(id="autosys-zz", environment="ZZ", scheduler="autosys")
+    assert no_description.display_name == "ZZ"
+
+
+def test_only_autosys_u1_and_process_scheduler_u5_are_enabled_by_default():
+    from app.config import load_environments
+
+    enabled = load_environments()
+    assert [(entry.id, entry.environment) for entry in enabled] == [
+        ("autosys-u1", "U1"),
+        ("ps-u5", "U5"),
+    ]
+
+
+def test_compare_page_defaults_to_enabled_autosys_u1_vs_process_scheduler_u5():
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    client = TestClient(app)
+    resp = client.get("/compare")
+    assert resp.status_code == 200
+    assert 'value="autosys-u1" selected' in resp.text
+    assert 'value="ps-u5" selected' in resp.text

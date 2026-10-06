@@ -2,6 +2,8 @@
 # Values are compared semantically where AutoSys accepts equivalent syntax
 # (for example CMD/C, y/1/true, success(job)/s(job), or reordered time/code lists).
 timing_threshold_sec: 60
+# Execution duration comparison: abs((right_end-right_start) - (left_end-left_start)).
+execution_time_threshold_sec: 300
 
 jil_parameters:
   # Identity / placement / execution target

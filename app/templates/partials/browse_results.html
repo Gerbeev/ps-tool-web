@@ -1,6 +1,13 @@
 <input type="hidden" id="session-id" name="session_id" value="{{ session_id }}">
 <header class="box__section box__pad box-section-head">
-  <p class="browse-meta"><strong>{{ meta_line }}</strong> · {{ snapshot.flat_jobs|length }} jobs</p>
+  <div>
+    <p class="browse-meta"><strong>{{ meta_line }}</strong> · {{ snapshot.flat_jobs|length }} jobs</p>
+    {% if snapshot_origin == 'current' and snapshot_manifest %}
+    <p class="muted small">Using current comparison snapshot · {{ snapshot_side }} side · captured {{ snapshot_manifest.captured_at }}. No scheduler fetch was performed.</p>
+    {% else %}
+    <p class="muted small">Loaded for Browse only. This does not replace the current comparison snapshot.</p>
+    {% endif %}
+  </div>
 </header>
 <div id="browse-workspace" class="browse-workspace box__section">
   <div class="browse-tree-column">

@@ -15,7 +15,9 @@ from app.context_helpers import (
     topology_options,
 )
 from app.search.sqlite_fts import search_index
-from app.services.comparison import compare_snapshots, fetch_snapshot, job_status_css
+from app.services.comparison import compare_snapshots, job_status_css
+from app.services.current_snapshot import current_snapshot_store
+from app.services.current_snapshot_flow import SnapshotCaptureError, get_or_capture_current_pair
 from app.services.table_rows import (
     iter_table_rows,
     page_table_rows,
@@ -72,6 +74,9 @@ def _mismatch_logical_ids(result) -> set[str]:
     for m in result.parameter_mismatches:
         if m.logical_id:
             ids.add(m.logical_id)
+    for pair in result.execution_time_deltas:
+        if pair.logical_id:
+            ids.add(pair.logical_id)
     return ids
 
 
@@ -80,7 +85,7 @@ async def compare_page(request: Request):
     envs = _env_options()
     default_env = envs[0].id if envs else "uat-rd"
     left_env = default_env
-    right_env = envs[2].id if len(envs) > 2 else default_env
+    right_env = envs[1].id if len(envs) > 1 else default_env
     left_ctx = _side_form_context(left_env)
     right_ctx = _side_form_context(right_env)
     return templates.TemplateResponse(
@@ -94,6 +99,7 @@ async def compare_page(request: Request):
             "right": right_ctx,
             "result": None,
             "session_id": None,
+            "current_snapshot_manifest": current_snapshot_store.load_manifest(),
         },
     )
 
@@ -132,6 +138,7 @@ async def run_compare(
     right_scheduler: str = Form(""),
     right_as_of: str = Form(""),
     right_topology: str = Form(""),
+    refresh: bool = Form(False),
 ):
     if not left_scheduler:
         left_scheduler = environment_scheduler_value(left_env)
@@ -139,8 +146,16 @@ async def run_compare(
         right_scheduler = environment_scheduler_value(right_env)
     left = parse_compare_side_context(left_env, left_scheduler, left_as_of, left_topology)
     right = parse_compare_side_context(right_env, right_scheduler, right_as_of, right_topology)
-    left_snap, _ = fetch_snapshot(left)
-    right_snap, _ = fetch_snapshot(right)
+    try:
+        current_pair = get_or_capture_current_pair(left, right, refresh=refresh)
+    except SnapshotCaptureError as exc:
+        return HTMLResponse(
+            f'<div class="box__section box__pad"><p><strong>Snapshot refresh failed.</strong> {exc}</p>'
+            '<p class="muted small">The previous current snapshot was kept unchanged.</p></div>',
+            status_code=502,
+        )
+    left_snap = current_pair.left
+    right_snap = current_pair.right
     result = compare_snapshots(left_snap, right_snap)
     search_index.rebuild(left_snap, "left")
     search_index.rebuild(right_snap, "right")
@@ -165,6 +180,8 @@ async def run_compare(
             "table_filter": "all",
             "table_limit": settings.table_page_size_default,
             "mismatch_ids": _mismatch_logical_ids(result),
+            "snapshot_manifest": current_pair.manifest,
+            "snapshot_origin": current_pair.origin,
         },
     )
 
@@ -197,6 +214,11 @@ async def compare_table(
             "q_prefix": q_prefix,
             "default_limit": settings.table_page_size_default,
             "param_mismatches_by_id": parameter_mismatches_by_logical_id(session.result),
+            "execution_time_mismatch_ids": {
+                pair.logical_id
+                for pair in session.result.execution_time_deltas
+                if pair.logical_id
+            },
         },
     )
 

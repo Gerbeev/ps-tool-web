@@ -37,7 +37,7 @@ Configured JIL-equivalent fields are compared using semantic normalization rathe
 
 ### Runtime
 
-Normalized status, resolved command, exit code, actual start/end and timing deviation are compared only when the corresponding adapter declares runtime coverage.
+Normalized status, resolved command, exit code, actual start/end and timing deviation are compared only when the corresponding adapter declares runtime coverage. Execution time is derived canonically as `actual_end - actual_start` and formatted as `HH:MM:SS`. Its cross-environment delta is tracked separately from timestamp drift: `right_exec_time - left_exec_time`, where a positive value means the migration target is slower. `execution_time_threshold_sec` controls when that delta becomes an execution-time mismatch.
 
 ## Three-State Comparison Behavior
 
@@ -54,7 +54,7 @@ This prevents missing adapter functionality from being misreported as a migratio
 `ComparisonSummary` includes:
 
 - total/matched/left-only/right-only jobs;
-- status/timing/parameter mismatch counts;
+- status/timing/execution-time/parameter mismatch counts;
 - per-parameter mismatch counts;
 - total not-comparable comparisons;
 - per-parameter not-comparable counts;

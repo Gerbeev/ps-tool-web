@@ -21,6 +21,7 @@ TOPOLOGY_COLUMNS = [
     "actual_start_utc",
     "actual_end_utc",
     "duration_sec",
+    "exec_time",
     "exit_code",
     "machine",
     "jil_job_name",
@@ -46,6 +47,10 @@ COMPARISON_COLUMNS = [
     "parameter_mismatches",
     "not_comparable_parameters",
     "timing_delta_sec",
+    "left_exec_time",
+    "right_exec_time",
+    "exec_time_delta",
+    "exec_time_delta_sec",
     "match_confidence",
 ]
 
@@ -99,6 +104,7 @@ def iter_topology_rows(snapshot: TopologySnapshot):
             "actual_start_utc": _format_dt(job.actual_start),
             "actual_end_utc": _format_dt(job.actual_end),
             "duration_sec": job.duration_sec if job.duration_sec is not None else "",
+            "exec_time": job.exec_time or "",
             "exit_code": job.exit_code if job.exit_code is not None else "",
             "machine": job.machine or "",
             "jil_job_name": jil.job_name or "",
@@ -136,12 +142,15 @@ def _diff_kind(
     *,
     definition_mismatch_ids: set[str],
     timing_mismatch_ids: set[str],
+    execution_time_mismatch_ids: set[str],
 ) -> str:
     if pair.left and pair.right:
         if pair.left.status != pair.right.status:
             return "status_mismatch"
         if pair.logical_id and pair.logical_id in definition_mismatch_ids:
             return "definition_mismatch"
+        if pair.logical_id and pair.logical_id in execution_time_mismatch_ids:
+            return "execution_time_mismatch"
         if pair.logical_id and pair.logical_id in timing_mismatch_ids:
             return "timing_mismatch"
         return "ok"
@@ -186,6 +195,9 @@ def iter_comparison_rows(result: ComparisonResult):
     timing_mismatch_ids = {
         pair.logical_id for pair in result.timing_deltas if pair.logical_id
     }
+    execution_time_mismatch_ids = {
+        pair.logical_id for pair in result.execution_time_deltas if pair.logical_id
+    }
 
     for pair in _comparison_row_pairs(result):
         logical_id = pair.logical_id or ""
@@ -199,6 +211,7 @@ def iter_comparison_rows(result: ComparisonResult):
                 pair,
                 definition_mismatch_ids=definition_mismatch_ids,
                 timing_mismatch_ids=timing_mismatch_ids,
+                execution_time_mismatch_ids=execution_time_mismatch_ids,
             ),
             "parameter_mismatches": _parameter_mismatch_summary(
                 pair, parameter_names_by_id
@@ -207,6 +220,14 @@ def iter_comparison_rows(result: ComparisonResult):
                 sorted(not_comparable_names_by_id.get(logical_id, set()))
             ),
             "timing_delta_sec": _timing_delta_pair(pair),
+            "left_exec_time": pair.left.exec_time if pair.left and pair.left.exec_time else "",
+            "right_exec_time": pair.right.exec_time if pair.right and pair.right.exec_time else "",
+            "exec_time_delta": pair.execution_time_delta or "",
+            "exec_time_delta_sec": (
+                pair.execution_time_delta_sec
+                if pair.execution_time_delta_sec is not None
+                else ""
+            ),
             "match_confidence": pair.confidence.value,
         }
 
@@ -221,6 +242,10 @@ def iter_comparison_rows(result: ComparisonResult):
             "parameter_mismatches": "",
             "not_comparable_parameters": "identity",
             "timing_delta_sec": "",
+            "left_exec_time": "",
+            "right_exec_time": "",
+            "exec_time_delta": "",
+            "exec_time_delta_sec": "",
             "match_confidence": "unmatched",
         }
 

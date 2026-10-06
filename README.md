@@ -3,7 +3,7 @@
 
 ## Canonical 2,500-job mock dataset
 
-Until real scheduler endpoint adapters are wired, local mock mode uses one environment-neutral reference file: `data/mock/reference_topology_2500.jsonl`. It contains exactly 2,500 hierarchical scheduler nodes across 25 synthetic four-digit business groups. U5, P1 and other environments are materialized from this same file by changing only the embedded environment token in native job names. See `docs/mock-reference-data.md`.
+Until real scheduler endpoint adapters are wired, local mock mode uses one healthy environment-neutral reference file: `data/mock/reference_topology_2500.jsonl`. It contains exactly 2,500 hierarchical jobs across 25 synthetic four-digit business groups. AutoSys U1 is the default healthy reference projection. Process Scheduler U5 is materialized from the same source and receives a deterministic migration-problem overlay from `data/mock/u1_to_u5_migration_overlay.jsonl` (missing, failed, long-running, activated/waiting, on-ice/cancelled, slow-success execution-time regressions, timing and selected definition/dependency drift). Only AutoSys U1 and Process Scheduler U5 are enabled by default for Browse/Compare. See `docs/mock-reference-data.md`.
 
 ## Quick Start on Windows
 
@@ -90,14 +90,14 @@ This workflow is intended to highlight migration gaps quickly rather than requir
 
 The **Settings** view manages scheduler-specific environment definitions used by Browse and Compare. Process Scheduler and AutoSys are configured on separate tabs and persisted to separate YAML files.
 
-Environment configuration includes:
+Each scheduler tab exposes only the operator-facing fields needed for connection management:
 
-- Environment identifier and display name.
-- Scheduler type (`autosys` or `process_scheduler`).
-- Host information.
-- Connector profile metadata.
+- Environment code.
+- Host.
+- Description.
+- Enabled state, including a header checkbox to enable or disable every environment in that scheduler table.
 
-The configuration is persisted in YAML and can be extended for real scheduler connectors.
+Display labels are generated dynamically as `ENV (Description)` and are not duplicated in YAML. The scheduler type comes from the scheduler-specific config file. Internal adapter-selection metadata may be supplied by a bank deployment, but it is intentionally not exposed as an editable Settings column.
 
 ## Functional Features
 
@@ -141,7 +141,7 @@ The parameters used for parity checks are configurable in `config/autosys_compar
 - Normalized cross-scheduler status is compared separately from native status strings.
 - Actual start and end times.
 
-Timing comparison uses a configurable tolerance instead of requiring exact timestamps.
+Timing comparison uses a configurable tolerance instead of requiring exact timestamps. Completed jobs also expose `Exec Time` as `actual_end - actual_start` in `HH:MM:SS`; Compare shows left/right execution time plus signed `Exec Δ (R−L)` and flags duration regressions using a separate configurable execution-time threshold.
 
 ### Topology and Dependency Navigation
 
@@ -171,9 +171,15 @@ Comparison sessions can export:
 
 This allows findings to be reviewed outside the UI or attached to migration and validation workflows.
 
-### Snapshot Caching and Session State
+### Current Comparison Snapshot
 
-Fetched scheduler snapshots are cached and reused during a session to avoid unnecessary repeated retrieval. Browse and Compare maintain session-scoped state for subsequent tree, job-detail, search, and export requests.
+The UI keeps exactly **one durable current comparison snapshot** rather than a historical snapshot catalog. A comparison captures both scheduler sides for the selected business date/run/topology, validates both snapshots, and then atomically publishes the pair under `data/runtime/current` (configurable with `CURRENT_SNAPSHOT_DIR`).
+
+`Compare snapshot` reuses the saved pair when the selected contexts match exactly, so repeated analysis does not re-fetch the schedulers. `Refresh & compare` forces both sources to be fetched again. If either source fetch or validation fails, the previous current snapshot remains unchanged. Changing an environment, business date/run, topology, endpoint, or filter makes the current pair stale for that request and causes a new pair to be captured.
+
+Browse reuses the matching side of the current comparison snapshot when possible. Tree expansion, job details, search, comparison tables, and CSV exports use the frozen session snapshots, keeping one analysis internally consistent even while scheduler state continues to change. See `docs/current-snapshot.md` for the lifecycle and storage contract.
+
+A small in-memory LRU remains as an optimization for non-current exploratory loads; it is not the source of truth for the current comparison snapshot.
 
 ## Intended Users
 

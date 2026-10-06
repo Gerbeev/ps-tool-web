@@ -20,7 +20,15 @@
   <div class="box__section box__pad">
     <p class="box-field-label">Identity &amp; run</p>
     <dl class="job-detail-dl">
+      <dt>Description</dt><dd>{{ job.autosys.jil.description or (job.process_scheduler.description if job.process_scheduler else '—') or '—' }}</dd>
+      {% if job.attributes.get('mock_migration_issue') %}
+      <dt>Mock migration issue</dt><dd><strong>{{ job.attributes.get('mock_migration_issue') }}</strong></dd>
+      {% endif %}
       <dt>Status</dt><dd class="{{ job_status_css(job.status) }}">{{ job.status.value }} ({{ job.status_raw }})</dd>
+      <dt>Machine</dt><dd><code>{{ job.machine or '—' }}</code></dd>
+      <dt>Parent / box</dt><dd><code>{{ job.box_name or '—' }}</code></dd>
+      <dt>Schedule</dt><dd><code>{{ job.autosys.jil.days_of_week or (job.process_scheduler.schedule if job.process_scheduler else '—') or '—' }}</code></dd>
+      <dt>Start at</dt><dd><code>{{ job.autosys.jil.start_times or (job.process_scheduler.start_at_time if job.process_scheduler else '—') or '—' }}</code></dd>
       <dt>job_uid</dt><dd><code>{{ job.job_uid }}</code></dd>
       <dt>Logical ID</dt><dd><code>{{ job.logical_id or '—' }}</code></dd>
       <dt>scheduler_native_id</dt><dd><code>{{ job.scheduler_native_id or '—' }}</code></dd>
@@ -30,7 +38,7 @@
       <dt>Scheduled start</dt><dd>{% if job.scheduled_start %}{{ job.scheduled_start.strftime('%Y-%m-%d %H:%M:%S') }}{% else %}—{% endif %}</dd>
       <dt>Start</dt><dd>{% if job.actual_start %}{{ job.actual_start.strftime('%Y-%m-%d %H:%M:%S') }}{% else %}—{% endif %}</dd>
       <dt>End</dt><dd>{% if job.actual_end %}{{ job.actual_end.strftime('%Y-%m-%d %H:%M:%S') }}{% else %}—{% endif %}</dd>
-      <dt>Duration (s)</dt><dd>{{ job.duration_sec if job.duration_sec is not none else '—' }}</dd>
+      <dt>Exec Time</dt><dd><code>{{ job.exec_time or '—' }}</code></dd>
       <dt>Exit code</dt><dd>{{ job.exit_code if job.exit_code is not none else '—' }}</dd>
     </dl>
   </div>

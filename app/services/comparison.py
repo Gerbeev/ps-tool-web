@@ -46,12 +46,14 @@ _SYNTHETIC_DEFINITION_PARAMETERS = {"dependencies", "topology_parent"}
 def fetch_snapshot(
     context: ComparisonContext,
     cache: SnapshotCache | None = None,
+    *,
+    force_refresh: bool = False,
 ) -> tuple[TopologySnapshot, str]:
     """Fetch, normalize metadata, validate, and optionally cache a topology snapshot."""
     c = cache or snapshot_cache
     adapter = get_adapter(context.scheduler, context.environment_id)
     key = SnapshotCache.context_key(context, context.scheduler.value)
-    snap = c.get(key)
+    snap = None if force_refresh else c.get(key)
     if snap is None:
         snap = adapter.fetch_topology(context)
         should_cache = True
@@ -93,6 +95,7 @@ def compare_snapshots(
     """Compare already-fetched snapshots without repeating adapter/cache work."""
     cfg = load_compare_parameters()
     timing_threshold_sec = cfg.timing_threshold_sec
+    execution_time_threshold_sec = cfg.execution_time_threshold_sec
 
     left_confidence_by_uid = _confidence_by_uid(left_snap, left_snap.context.scheduler)
     right_confidence_by_uid = _confidence_by_uid(right_snap, right_snap.context.scheduler)
@@ -117,6 +120,7 @@ def compare_snapshots(
     right_only: list[SnapshotJob] = []
     status_mismatches: list[JobPair] = []
     timing_deltas: list[JobPair] = []
+    execution_time_deltas: list[JobPair] = []
     definition_mismatches: list[JobPair] = []
     parameter_mismatches: list[ParameterMismatch] = []
     not_comparable: list[NotComparableParameter] = []
@@ -164,6 +168,14 @@ def compare_snapshots(
                 delta = _timing_delta_sec(left_job, right_job)
                 if delta is not None and delta > timing_threshold_sec:
                     timing_deltas.append(pair)
+
+            if _execution_time_comparable(left_job, right_job, left_snap, right_snap):
+                exec_delta = pair.execution_time_delta_sec
+                if (
+                    exec_delta is not None
+                    and abs(exec_delta) > execution_time_threshold_sec
+                ):
+                    execution_time_deltas.append(pair)
 
             mismatches, skipped = compare_job_parameters_detailed(
                 left_job,
@@ -228,6 +240,7 @@ def compare_snapshots(
         mismatched_parameters=len(parameter_mismatches),
         parameter_mismatch_counts=param_counts,
         mismatched_timing=len(timing_deltas),
+        mismatched_execution_time=len(execution_time_deltas),
         left_only_count=len(left_only),
         right_only_count=len(right_only),
         not_comparable_parameters=len(not_comparable),
@@ -243,6 +256,7 @@ def compare_snapshots(
         right_only=right_only,
         status_mismatches=status_mismatches,
         timing_deltas=timing_deltas,
+        execution_time_deltas=execution_time_deltas,
         definition_mismatches=definition_mismatches,
         parameter_mismatches=parameter_mismatches,
         not_comparable=not_comparable,
@@ -604,6 +618,27 @@ def _runtime_timing_comparable(
             return True
     return False
 
+
+
+def _execution_time_comparable(
+    left: SnapshotJob,
+    right: SnapshotJob,
+    left_snapshot: TopologySnapshot,
+    right_snapshot: TopologySnapshot,
+) -> bool:
+    """Execution time requires both actual start and end on both sides."""
+    for parameter in ("actual_start", "actual_end"):
+        if (
+            _field_support(left, parameter, left_snapshot.capabilities)
+            != FieldSupport.SUPPORTED
+            or _field_support(right, parameter, right_snapshot.capabilities)
+            != FieldSupport.SUPPORTED
+        ):
+            return False
+    return (
+        left.execution_time_sec is not None
+        and right.execution_time_sec is not None
+    )
 
 def _best_confidence(a: MatchConfidence | None, b: MatchConfidence | None) -> MatchConfidence:
     order = [

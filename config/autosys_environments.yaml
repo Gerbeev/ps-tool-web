@@ -1,15 +1,10 @@
 # AutoSys environment connections.
-# Only information directly observed in the supplied reference is populated.
-# The self-help web host is NOT assumed to be the future adapter API endpoint.
+# Operator-editable fields: environment, host, description, enabled.
+# Display names are derived dynamically. Secrets/credentials do not belong here.
 scheduler: autosys
 environments:
 - id: autosys-u1
   environment: U1
   host: autosys.ldn.swissbank.com
   description: U1 AutoSys reference environment
-  display_name: U1 (AutoSys)
-  transport: HTTPS / self-help UI observed
-  connector_profile: ''
   enabled: true
-  source: AutoSys self-help reference capture
-  notes: Adapter service/API endpoint and path are still TBD; do not treat /selfhelp/tool.cgi as the adapter contract.

@@ -22,6 +22,7 @@ from app.context_helpers import (
 from app.models import SchedulerType
 from app.search.sqlite_fts import search_index
 from app.services.comparison import fetch_snapshot, job_status_css
+from app.services.current_snapshot import current_snapshot_store
 from app.services.topology_index import child_count, get_child_nodes, get_job, lazy_roots
 from app.session_store import BrowseSession, session_store
 
@@ -102,7 +103,15 @@ async def browse_load(
     if not as_of:
         as_of = default_business_date()
     context = parse_browse_context(environment_id, scheduler, as_of, topology)
-    snapshot, _ = fetch_snapshot(context)
+    current = current_snapshot_store.load_for_context(context)
+    if current is not None:
+        snapshot, snapshot_manifest, snapshot_side = current
+        snapshot_origin = "current"
+    else:
+        snapshot, _ = fetch_snapshot(context)
+        snapshot_manifest = None
+        snapshot_side = None
+        snapshot_origin = "live"
     search_index.rebuild(snapshot, "left")
     sid = session_store.new_id()
     session_store.put_browse(BrowseSession(session_id=sid, context=context, snapshot=snapshot))
@@ -115,6 +124,9 @@ async def browse_load(
             "session_id": sid,
             "context": context,
             "meta_line": _meta_line(context, meta),
+            "snapshot_origin": snapshot_origin,
+            "snapshot_manifest": snapshot_manifest,
+            "snapshot_side": snapshot_side,
         },
     )
 

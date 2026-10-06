@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import base64
 import json
 from collections import defaultdict
 from datetime import datetime, timedelta
@@ -11,7 +12,6 @@ from typing import Any
 
 from app.autosys_reference import AutoSysJobDefinition, AutoSysJobReference, AutoSysRunInstance
 from app.config import get_environment, get_settings
-from app.process_scheduler_reference import ProcessSchedulerJobReference
 from app.models import (
     ComparisonContext,
     DependencyEdge,
@@ -22,8 +22,10 @@ from app.models import (
     SnapshotJob,
     TopologySnapshot,
 )
+from app.process_scheduler_reference import ProcessSchedulerJobReference
 
 _REFERENCE_DATASET = "reference_2500"
+_DISABLED_SCENARIOS = {"", "none", "off", "disabled", "false", "0"}
 
 _AUTOSYS_STATUS = {
     JobStatus.SUCCESS: "SU",
@@ -86,8 +88,55 @@ def _load_reference(path_text: str) -> tuple[dict[str, Any], tuple[dict[str, Any
     return metadata, tuple(jobs)
 
 
+@lru_cache(maxsize=4)
+def _load_scenario(path_text: str) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+    path = Path(path_text)
+    if not path.is_file():
+        raise FileNotFoundError(f"Mock migration scenario not found: {path}")
+
+    metadata: dict[str, Any] | None = None
+    issues_by_ref: dict[str, dict[str, Any]] = {}
+    with path.open(encoding="utf-8") as handle:
+        for line_number, raw_line in enumerate(handle, start=1):
+            line = raw_line.strip()
+            if not line:
+                continue
+            row = json.loads(line)
+            record_type = row.get("record_type")
+            if record_type == "metadata":
+                if metadata is not None:
+                    raise ValueError(f"Duplicate scenario metadata record in {path}")
+                metadata = row
+            elif record_type == "issue":
+                ref = str(row.get("job_ref") or "")
+                if not ref:
+                    raise ValueError(f"Scenario issue without job_ref at {path}:{line_number}")
+                if ref in issues_by_ref:
+                    raise ValueError(f"Duplicate scenario issue for {ref!r} in {path}")
+                issues_by_ref[ref] = row
+            else:
+                raise ValueError(f"Unknown scenario record_type {record_type!r} at {path}:{line_number}")
+
+    if metadata is None:
+        raise ValueError(f"Missing scenario metadata record in {path}")
+    expected = int(metadata.get("issue_count", -1))
+    if expected != len(issues_by_ref):
+        raise ValueError(
+            f"Scenario issue_count={expected} but contains {len(issues_by_ref)} issue records"
+        )
+    return metadata, issues_by_ref
+
+
 def reference_metadata() -> dict[str, Any]:
     metadata, _ = _load_reference(str(get_settings().mock_reference_path))
+    return dict(metadata)
+
+
+def reference_scenario_metadata() -> dict[str, Any]:
+    settings = get_settings()
+    if settings.mock_scenario in _DISABLED_SCENARIOS:
+        return {}
+    metadata, _ = _load_scenario(str(settings.mock_scenario_path))
     return dict(metadata)
 
 
@@ -117,20 +166,16 @@ def _name(record: dict[str, Any], environment_token: str) -> str:
 
 
 def _uid(context: ComparisonContext, job_ref: str) -> str:
-    return f"{context.scheduler.value}:{context.environment_id}:{job_ref}"
+    """Return a stable URL-safe UID while preserving the hierarchical native ref."""
+    token = base64.urlsafe_b64encode(job_ref.encode("utf-8")).decode("ascii").rstrip("=")
+    return f"{context.scheduler.value}:{context.environment_id}:{token}"
 
 
-def _runtime_times(
+def _base_runtime_times(
     record: dict[str, Any], base: datetime
-) -> tuple[datetime | None, datetime | None, float | None]:
-    status = JobStatus(record["status"])
-    if status in {JobStatus.PENDING, JobStatus.DISABLED, JobStatus.NOT_RUN}:
-        return None, None, None
-
+) -> tuple[datetime, datetime, float]:
     start = base + timedelta(seconds=int(record["start_offset_sec"]))
     duration = float(record["duration_sec"])
-    if status == JobStatus.RUNNING:
-        return start, None, None
     return start, start + timedelta(seconds=duration), duration
 
 
@@ -157,13 +202,80 @@ def _ps_job_type(record: dict[str, Any]) -> str:
     return "Box" if record.get("job_type") == "BOX" else str(record.get("job_type") or "")
 
 
+def _scenario_for_context(
+    context: ComparisonContext,
+) -> tuple[dict[str, Any], dict[str, dict[str, Any]]]:
+    settings = get_settings()
+    if settings.mock_scenario in _DISABLED_SCENARIOS:
+        return {}, {}
+
+    metadata, issues_by_ref = _load_scenario(str(settings.mock_scenario_path))
+    target_scheduler = str(metadata.get("target_scheduler") or "")
+    target_environment = str(metadata.get("target_environment") or "").upper()
+    if context.scheduler.value != target_scheduler:
+        return metadata, {}
+    if _environment_token(context) != target_environment:
+        return metadata, {}
+    return metadata, issues_by_ref
+
+
+def _apply_runtime_scenario(
+    *,
+    record: dict[str, Any],
+    base: datetime,
+    scheduler: SchedulerType,
+    scenario_metadata: dict[str, Any],
+    issue: dict[str, Any] | None,
+) -> tuple[JobStatus, str, datetime | None, datetime | None, float | None, int | None]:
+    status = JobStatus(str((issue or {}).get("status") or record["status"]))
+    start, end, duration = _base_runtime_times(record, base)
+
+    normal_shift = int(scenario_metadata.get("normal_target_start_shift_sec", 0) or 0)
+    if normal_shift:
+        start += timedelta(seconds=normal_shift)
+        end += timedelta(seconds=normal_shift)
+
+    if issue:
+        start += timedelta(seconds=int(issue.get("start_shift_sec", 0) or 0))
+        end += timedelta(seconds=int(issue.get("end_shift_sec", 0) or 0))
+        end += timedelta(seconds=int(issue.get("duration_add_sec", 0) or 0))
+        if issue.get("clear_start"):
+            start = None
+        if issue.get("clear_end"):
+            end = None
+
+    if status in {JobStatus.PENDING, JobStatus.DISABLED, JobStatus.NOT_RUN}:
+        start = None
+        end = None
+        duration = None
+    elif status == JobStatus.RUNNING:
+        end = None
+        duration = None
+    elif start is not None and end is not None:
+        duration = (end - start).total_seconds()
+
+    if issue and "exit_code" in issue:
+        exit_code = issue.get("exit_code")
+    else:
+        exit_code = record.get("exit_code")
+
+    raw = str((issue or {}).get("raw_status") or _status_raw(scheduler, status))
+    return status, raw, start, end, duration, exit_code
+
+
 def build_reference_snapshot(context: ComparisonContext) -> TopologySnapshot:
     """Materialize one scheduler/environment view from the environment-neutral fixture."""
     metadata, records_tuple = _load_reference(str(get_settings().mock_reference_path))
-    records = list(records_tuple)
+    all_records = list(records_tuple)
     env_token = _environment_token(context)
     base = _business_datetime(context)
     topology_id = str(metadata.get("topology_id") or "DataPlatform_REFERENCE")
+    scenario_metadata, issues_by_ref = _scenario_for_context(context)
+
+    missing_refs = {
+        ref for ref, issue in issues_by_ref.items() if issue.get("issue_type") == "missing"
+    }
+    records = [record for record in all_records if record["job_ref"] not in missing_refs]
 
     by_ref = {record["job_ref"]: record for record in records}
     name_by_ref = {ref: _name(record, env_token) for ref, record in by_ref.items()}
@@ -184,22 +296,31 @@ def build_reference_snapshot(context: ComparisonContext) -> TopologySnapshot:
     flat_jobs: list[SnapshotJob] = []
     for record in records:
         ref = record["job_ref"]
-        status = JobStatus(record["status"])
-        start, end, duration = _runtime_times(record, base)
+        issue = issues_by_ref.get(ref)
+        status, status_raw, start, end, duration, exit_code = _apply_runtime_scenario(
+            record=record,
+            base=base,
+            scheduler=context.scheduler,
+            scenario_metadata=scenario_metadata if issues_by_ref else {},
+            issue=issue,
+        )
         parent_ref = record.get("parent_ref")
         job_name = name_by_ref[ref]
         parent_name = name_by_ref[parent_ref] if parent_ref else None
+
         command = record.get("command")
+        if command and issue and issue.get("command_suffix"):
+            command = f"{command}{issue['command_suffix']}"
         watch_file = record.get("watch_file")
-        status_raw = _status_raw(context.scheduler, status)
-        schedule = record.get("schedule")
+        machine = (issue or {}).get("machine", record.get("machine"))
+        schedule = (issue or {}).get("schedule", record.get("schedule"))
         start_at_time = record.get("start_at_time")
         scheduled_start = _scheduled_start(record, base)
 
         definition = AutoSysJobDefinition(
             job_name=job_name,
             job_type=record["job_type"],
-            machine=record.get("machine"),
+            machine=machine,
             box_name=parent_name,
             command=command,
             watch_file=watch_file,
@@ -233,7 +354,7 @@ def build_reference_snapshot(context: ComparisonContext) -> TopologySnapshot:
             actual_end=end,
             resolved_command=command,
             resolved_watch_file=watch_file,
-            exit_code=record.get("exit_code"),
+            exit_code=exit_code,
         )
         ps_reference = None
         if context.scheduler == SchedulerType.PROCESS_SCHEDULER:
@@ -252,6 +373,17 @@ def build_reference_snapshot(context: ComparisonContext) -> TopologySnapshot:
                 StartAtTimeForce=bool(record.get("start_at_time_force", False)),
                 Status=status_raw,
             )
+
+        attributes: dict[str, Any] = {
+            "native_job_type": record["job_type"],
+            "semantic_type": record["semantic_type"],
+            "business_code": record["business_code"],
+            "environment_token": env_token,
+            "reference_job_ref": ref,
+        }
+        if issue:
+            attributes["mock_migration_issue"] = issue["issue_type"]
+
         job = SnapshotJob(
             job_uid=_uid(context, ref),
             scheduler_native_id=ref,
@@ -264,16 +396,10 @@ def build_reference_snapshot(context: ComparisonContext) -> TopologySnapshot:
             actual_start=start,
             actual_end=end,
             duration_sec=duration,
-            exit_code=record.get("exit_code"),
+            exit_code=exit_code,
             autosys=AutoSysJobReference(jil=definition, run=run),
             process_scheduler=ps_reference,
-            attributes={
-                "native_job_type": record["job_type"],
-                "semantic_type": record["semantic_type"],
-                "business_code": record["business_code"],
-                "environment_token": env_token,
-                "reference_job_ref": ref,
-            },
+            attributes=attributes,
         )
         jobs_by_ref[ref] = job
         flat_jobs.append(job)
@@ -294,7 +420,12 @@ def build_reference_snapshot(context: ComparisonContext) -> TopologySnapshot:
     edges: list[DependencyEdge] = []
     for record in records:
         target_ref = record["job_ref"]
+        target_issue = issues_by_ref.get(target_ref)
+        if target_issue and target_issue.get("remove_incoming_dependency"):
+            continue
         for source_ref in record.get("depends_on", []):
+            if source_ref in missing_refs:
+                continue
             if source_ref not in jobs_by_ref:
                 raise ValueError(f"Unknown dependency source {source_ref!r} for {target_ref!r}")
             edges.append(
@@ -306,6 +437,16 @@ def build_reference_snapshot(context: ComparisonContext) -> TopologySnapshot:
                 )
             )
 
+    role = "neutral"
+    if scenario_metadata:
+        if (
+            context.scheduler.value == scenario_metadata.get("baseline_scheduler")
+            and env_token == str(scenario_metadata.get("baseline_environment") or "").upper()
+        ):
+            role = "healthy_baseline"
+        elif issues_by_ref:
+            role = "migration_target"
+
     return TopologySnapshot(
         context=context,
         roots=roots,
@@ -313,7 +454,7 @@ def build_reference_snapshot(context: ComparisonContext) -> TopologySnapshot:
         edges=edges,
         metadata={
             "adapter": f"{context.scheduler.value}_mock_reference",
-            "connector_version": "reference-fixture-v2",
+            "connector_version": "reference-fixture-v4",
             "dataset_id": metadata["dataset_id"],
             "synthetic_count": len(flat_jobs),
             "business_group_count": metadata["business_group_count"],
@@ -321,6 +462,11 @@ def build_reference_snapshot(context: ComparisonContext) -> TopologySnapshot:
             "topology_id": topology_id,
             "business_date": context.as_of.value,
             "reference_path": str(get_settings().mock_reference_path),
+            "mock_scenario": scenario_metadata.get("scenario_id") if scenario_metadata else None,
+            "mock_scenario_role": role,
+            "mock_issue_count": len(issues_by_ref),
+            "mock_issue_counts": scenario_metadata.get("issue_counts", {}) if issues_by_ref else {},
+            "missing_job_count": len(missing_refs),
         },
     )
 

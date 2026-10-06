@@ -189,6 +189,7 @@ class AutoSysJobReference(BaseModel):
 
 class CompareParametersConfig(BaseModel):
     timing_threshold_sec: float = 60.0
+    execution_time_threshold_sec: float = 300.0
     jil_parameters: list[str] = Field(default_factory=list)
     run_parameters: list[str] = Field(default_factory=list)
 

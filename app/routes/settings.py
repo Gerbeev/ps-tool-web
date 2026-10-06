@@ -82,26 +82,16 @@ async def save_environment_connections(request: Request, scheduler: str):
         environment = (form.get(f"environment_{entry.id}") or entry.environment).strip()
         host = (form.get(f"host_{entry.id}") or "").strip()
         description = (form.get(f"description_{entry.id}") or "").strip()
-        display_name = (form.get(f"display_name_{entry.id}") or "").strip()
-        transport = (form.get(f"transport_{entry.id}") or "").strip()
-        connector_profile = (form.get(f"connector_profile_{entry.id}") or "").strip()
-        notes = (form.get(f"notes_{entry.id}") or "").strip()
         enabled = form.get(f"enabled_{entry.id}") == "on"
 
         updated.append(
             EnvironmentEntry(
                 id=entry.id,
                 environment=environment,
-                display_name=display_name or environment or entry.id,
                 description=description,
-                region=entry.region,
-                connector_profile=connector_profile or None,
                 scheduler=scheduler_type.value,
                 endpoint_url=host,
-                transport=transport,
                 enabled=enabled,
-                source=entry.source,
-                notes=notes,
             )
         )
 

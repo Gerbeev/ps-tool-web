@@ -27,7 +27,7 @@ The normal bank-side integration should be limited to:
 1. one AutoSys adapter module;
 2. one Process Scheduler adapter module;
 3. `app/adapters/site.py` to register both adapters;
-4. `config/process_scheduler_environments.yaml` / `config/autosys_environments.yaml` to select the registered `connector_profile`;
+4. `config/process_scheduler_environments.yaml` / `config/autosys_environments.yaml` for operator-managed environment/host/description/enabled values; bank deployments may add an internal `connector_profile` key when real adapter selection requires it (it is not exposed in the Settings table);
 5. `config/identity_map.yaml` only when scheduler names cannot be matched deterministically by existing rules.
 
 The agent should not modify `app/services/comparison.py` for source-specific behavior.
