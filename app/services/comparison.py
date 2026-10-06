@@ -23,7 +23,7 @@ from app.models import (
     SnapshotJob,
     TopologySnapshot,
 )
-from app.services.identity import annotate_snapshot_jobs
+from app.services.identity import annotate_snapshot_jobs, structured_logical_id
 from app.services.snapshot_cache import SnapshotCache, snapshot_cache
 from app.services.snapshot_validation import validate_snapshot
 from app.services.topology_index import ensure_topology_indexes
@@ -349,6 +349,11 @@ def compare_job_parameters_detailed(
             parameter,
             timing_threshold_sec=cfg.timing_threshold_sec,
         )
+        if parameter == "box_name" and left_value and right_value:
+            left_parent_id = structured_logical_id(left_value)
+            right_parent_id = structured_logical_id(right_value)
+            if left_parent_id is not None and right_parent_id is not None:
+                equal = left_parent_id == right_parent_id
         skip = _not_comparable_for_field(
             logical_id,
             parameter,

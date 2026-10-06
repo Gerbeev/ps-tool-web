@@ -1,5 +1,10 @@
 # ps-tool-web
 
+
+## Canonical 2,500-job mock dataset
+
+Until real scheduler endpoint adapters are wired, local mock mode uses one environment-neutral reference file: `data/mock/reference_topology_2500.jsonl`. It contains exactly 2,500 hierarchical scheduler nodes across 25 synthetic four-digit business groups. U5, P1 and other environments are materialized from this same file by changing only the embedded environment token in native job names. See `docs/mock-reference-data.md`.
+
 ## Quick Start on Windows
 
 From the project folder:
@@ -83,7 +88,7 @@ This workflow is intended to highlight migration gaps quickly rather than requir
 
 ### Settings
 
-The **Settings** view manages scheduler environment definitions used by Browse and Compare.
+The **Settings** view manages scheduler-specific environment definitions used by Browse and Compare. Process Scheduler and AutoSys are configured on separate tabs and persisted to separate YAML files.
 
 Environment configuration includes:
 
@@ -107,8 +112,11 @@ The application assigns logical identities to jobs so that differently named Aut
 Matching can use:
 
 - Explicit mappings from `config/identity_map.yaml`.
+- Structured scheduler naming rules from `config/job_naming_rules.yaml`.
 - Normalized job names.
 - Name-based fallback matching.
+
+The naming convention is modeled generically as `common prefix -> 4-digit business code -> environment token -> job-specific name`. For cross-environment comparison, the canonical identity retains the business code and job-specific name while excluding the environment token and globally shared prefix. Concrete business codes, environment values, job names, and the literal shared prefix are intentionally not stored in the rule definition.
 
 Each match carries a confidence classification such as mapped, normalized, name-only, or unmatched.
 
@@ -212,8 +220,10 @@ The application integrates only with scheduler service endpoints. Process Schedu
 
 | File | Purpose |
 |---|---|
-| `config/environments.yaml` | Scheduler environments, endpoint URLs, scheduler types, and connector profiles |
+| `config/process_scheduler_environments.yaml` | Process Scheduler environment/host catalog and connector profiles |
+| `config/autosys_environments.yaml` | AutoSys environment/host catalog and connector profiles |
 | `config/identity_map.yaml` | AutoSys ↔ Process Scheduler identity mappings and normalization rules |
+| `config/job_naming_rules.yaml` | Generic scheduler job-name structure and cross-environment identity rules |
 | `config/autosys_compare_parameters.yaml` | JIL/runtime parameters and timing threshold used for parity comparison |
 | `.env` | Runtime settings such as host, port, cache behavior, mock-adapter mode, and paths |
 | `.env.example` | Example runtime configuration |

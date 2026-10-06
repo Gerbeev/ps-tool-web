@@ -7,7 +7,7 @@ set "PORT=8000"
 set "RELOAD=--reload"
 
 if exist ".env" (
-  for /f "usebackq tokens=1,* delims==" %%A in (`findstr /r /c:"^PS_TOOL_WEB_HOST=" /c:"^PS_TOOL_WEB_PORT=" /c:"^PS_TOOL_WEB_RELOAD=" ".env"`) do (
+  for /f "usebackq tokens=1,* delims==" %%A in (`findstr /r /c:"^PS_TOOL_WEB_HOST=" /c:"^PS_TOOL_WEB_PORT=" /c:"^PS_TOOL_WEB_RELOAD=" /c:"^MOCK_DATASET=" /c:"^MOCK_REFERENCE_PATH=" /c:"^MOCK_JOB_COUNT=" ".env"`) do (
     if /i "%%A"=="PS_TOOL_WEB_HOST" set "HOST=%%B"
     if /i "%%A"=="PS_TOOL_WEB_PORT" set "PORT=%%B"
     if /i "%%A"=="PS_TOOL_WEB_RELOAD" (
@@ -15,6 +15,9 @@ if exist ".env" (
       if /i "%%B"=="0" set "RELOAD="
       if /i "%%B"=="no" set "RELOAD="
     )
+    if /i "%%A"=="MOCK_DATASET" set "MOCK_DATASET=%%B"
+    if /i "%%A"=="MOCK_REFERENCE_PATH" set "MOCK_REFERENCE_PATH=%%B"
+    if /i "%%A"=="MOCK_JOB_COUNT" set "MOCK_JOB_COUNT=%%B"
   )
 )
 

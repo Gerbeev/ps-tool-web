@@ -59,7 +59,7 @@ Do not put source-specific conditions into `app/services/comparison.py`.
 
 ## Identity Rules
 
-The engine assigns logical identity after retrieval. Prefer verified `identity_map.yaml` mappings where names differ. Do not resolve duplicate logical IDs by choosing the first result. Identity conflicts must remain visible until resolved.
+The engine assigns logical identity after retrieval. Prefer verified `identity_map.yaml` mappings where names differ. For cross-environment matching, follow `config/job_naming_rules.yaml`: parse the fixed shared prefix, four-digit business code, environment token, and job-specific remainder; retain business code + job-specific name in the canonical identity and exclude the environment token. Do not hardcode concrete business/environment values into the naming rule. Do not resolve duplicate logical IDs by choosing the first result. Identity conflicts must remain visible until resolved.
 
 ## Required Validation Commands
 

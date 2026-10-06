@@ -1,0 +1,443 @@
+# Parsed from the supplied AutoSys self-help runtime report screenshot.
+# This is a representative subset of visible rows, not a complete export.
+source:
+  scheduler: autosys
+  view: self_help_user_report
+  environment: IUT
+  query_pattern: IB_CT_CVA_1109_U1_*
+  generated_at_raw: "05. October 2026 13:44"
+  observed_columns:
+    - job_name
+    - last_start
+    - last_end
+    - st_ex
+    - run_ntry
+    - pri_xit
+    - timezone
+
+semantics:
+  timestamps:
+    source_format: "MM/DD/YYYY HH:mm:ss"
+    timezone_column_is_separate: true
+  native_columns:
+    st_ex: "Preserved exactly as displayed; normalize only after endpoint semantics are confirmed."
+    run_ntry: "Preserved as one raw field because the screenshot header groups Run/Ntry."
+    pri_xit: "Preserved as one raw field because the screenshot header groups Pri/Xit."
+  missing_value_raw: "-----"
+
+rows:
+  - job_name: IB_CT_CVA_1109_U1_Admin_Box
+    last_start: "10/02/2026 23:38:27"
+    last_end: "10/03/2026 00:23:33"
+    st_ex: SU
+    run_ntry: "753378748/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_Admin_HouseKeeping_RAIF_B3
+    last_start: "10/02/2026 23:38:29"
+    last_end: "10/02/2026 23:44:01"
+    st_ex: SU
+    run_ntry: "753378748/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_Admin_HouseKeeping_RAIF_CVA
+    last_start: "10/02/2026 23:38:28"
+    last_end: "10/03/2026 00:23:32"
+    st_ex: SU
+    run_ntry: "753378748/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_Admin_Jils
+    last_start: "10/02/2026 23:38:28"
+    last_end: "10/02/2026 23:40:25"
+    st_ex: SU
+    run_ntry: "753378748/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_Admin_HouseKeeping_BT_RMT_Reports
+    last_start: "10/02/2026 23:38:29"
+    last_end: "10/02/2026 23:38:34"
+    st_ex: SU
+    run_ntry: "753378748/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_Admin_RRS_CreatePartitions
+    last_start: "10/02/2026 23:38:29"
+    last_end: "10/02/2026 23:38:40"
+    st_ex: SU
+    run_ntry: "753378748/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_Deployment_Checker
+    last_start: "09/23/2026 23:38:27"
+    last_end: "09/23/2026 23:48:49"
+    st_ex: OI
+    run_ntry: "751045997/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_Admin_DiskCheck
+    last_start: "10/05/2026 13:30:28"
+    last_end: "10/05/2026 13:30:28"
+    st_ex: SU
+    run_ntry: "753780742/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_CheckRoll_Audit_Run_Box
+    last_start: "10/02/2026 23:38:27"
+    last_end: "10/05/2026 07:46:17"
+    st_ex: SU
+    run_ntry: "753378749/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_CheckRoll_Audit_ETD
+    last_start: "10/02/2026 23:38:28"
+    last_end: "10/02/2026 23:38:33"
+    st_ex: SU
+    run_ntry: "753378749/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_CheckRoll_Audit_OTC
+    last_start: "10/05/2026 07:46:12"
+    last_end: "10/05/2026 07:46:16"
+    st_ex: SU
+    run_ntry: "753378749/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_CVA_AUDIT_Box
+    last_start: "09/19/2025 09:25:06"
+    last_end: "09/19/2025 09:53:16"
+    st_ex: SU
+    run_ntry: "654421534/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_Exposures_RunSpec_CVA_AUDIT_L0
+    last_start: "09/19/2025 09:25:18"
+    last_end: "09/19/2025 09:25:19"
+    st_ex: SU
+    run_ntry: "654421534/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_SensiPP_CVA_AUDIT_L3_SlidesLoad
+    last_start: "09/19/2025 09:46:09"
+    last_end: "09/19/2025 09:53:16"
+    st_ex: SU
+    run_ntry: "654421534/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_CVA_AUDIT_NewMonthCheck
+    last_start: "10/04/2026 10:00:06"
+    last_end: "10/04/2026 10:00:19"
+    st_ex: SU
+    run_ntry: "753565184/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_CVA_QuarterEnd_RMT_Box
+    last_start: null
+    last_end: null
+    st_ex: OI
+    run_ntry: "0/0"
+    pri_xit: null
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DS_FG_CVA_RMT_QuarterEnd
+    last_start: null
+    last_end: null
+    st_ex: IN
+    run_ntry: "0/0"
+    pri_xit: null
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_SensiPP_CVA_RMT_QuarterEnd_Load
+    last_start: null
+    last_end: null
+    st_ex: IN
+    run_ntry: "0/0"
+    pri_xit: null
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_Box
+    last_start: "10/02/2026 23:38:27"
+    last_end: null
+    st_ex: RU
+    run_ntry: "753378750/1"
+    pri_xit: null
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_Daily_HouseKeep_Job
+    last_start: "10/03/2026 00:00:09"
+    last_end: "10/03/2026 00:03:32"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_Adjusted_Spreads_Box
+    last_start: "10/02/2026 23:38:29"
+    last_end: null
+    st_ex: RU
+    run_ntry: "753378750/1"
+    pri_xit: null
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_Adjusted_Spreads_APAC_Calc
+    last_start: "10/03/2026 00:15:21"
+    last_end: "10/03/2026 00:16:03"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_Adjusted_Spreads_EMEA_Calc
+    last_start: null
+    last_end: "10/02/2026 19:37:51"
+    st_ex: AC
+    run_ntry: "753378750/0"
+    pri_xit: null
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_Adjusted_Spreads_US_Calc
+    last_start: "10/03/2026 00:43:18"
+    last_end: "10/03/2026 00:43:36"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_Box
+    last_start: "10/02/2026 23:38:29"
+    last_end: null
+    st_ex: RU
+    run_ntry: "753378750/1"
+    pri_xit: null
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_Accounts_Load
+    last_start: "10/03/2026 05:27:52"
+    last_end: "10/03/2026 05:28:16"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_Cash_Collateral_Load
+    last_start: "10/03/2026 04:14:34"
+    last_end: "10/03/2026 04:15:44"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_Cash_Collateral_MF_Load
+    last_start: null
+    last_end: "10/02/2026 20:33:23"
+    st_ex: AC
+    run_ntry: "753378750/0"
+    pri_xit: null
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_Cash_Collateral_Watcher
+    last_start: "10/02/2026 23:38:31"
+    last_end: "10/03/2026 04:14:31"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_ClearedPositions_Load
+    last_start: "10/03/2026 05:27:20"
+    last_end: "10/03/2026 05:27:51"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_IM_GED_Load
+    last_start: "10/03/2026 03:46:47"
+    last_end: "10/03/2026 03:47:10"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_IM_GED_Watcher
+    last_start: "10/02/2026 23:38:32"
+    last_end: "10/03/2026 03:46:42"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_IM_MF_Load
+    last_start: null
+    last_end: "10/02/2026 20:53:19"
+    st_ex: AC
+    run_ntry: "753378750/0"
+    pri_xit: null
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_IM_OCC_Load
+    last_start: "10/05/2026 09:29:29"
+    last_end: "10/05/2026 09:29:35"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_IM_OCC_Watcher
+    last_start: "10/05/2026 09:00:10"
+    last_end: "10/05/2026 09:29:26"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_Non_Cash_Collateral_Load
+    last_start: "10/03/2026 04:11:51"
+    last_end: "10/03/2026 04:12:56"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_Non_Cash_Collateral_Watcher
+    last_start: "10/02/2026 23:38:31"
+    last_end: "10/03/2026 04:11:46"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_Position_Summary_Load
+    last_start: "10/03/2026 05:30:36"
+    last_end: "10/03/2026 05:31:27"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_Positions_Load
+    last_start: "10/03/2026 05:27:52"
+    last_end: "10/03/2026 05:30:35"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_Positions_Watcher
+    last_start: "10/02/2026 23:38:32"
+    last_end: "10/03/2026 05:27:13"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_MF_ACQA_TO_RA_POS
+    last_start: null
+    last_end: "10/02/2026 20:42:28"
+    st_ex: AC
+    run_ntry: "753378750/0"
+    pri_xit: null
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_MF_ACQA_TO_RA_POS_V3
+    last_start: null
+    last_end: "10/02/2026 20:33:09"
+    st_ex: AC
+    run_ntry: "753378750/0"
+    pri_xit: null
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_MF_ACQA_TO_RA_STATIC
+    last_start: null
+    last_end: "10/02/2026 20:52:53"
+    st_ex: AC
+    run_ntry: "753378750/0"
+    pri_xit: null
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_Netting
+    last_start: "10/03/2026 05:28:18"
+    last_end: "10/03/2026 05:28:34"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_MF_ACQA_TO_RA_POS_V3_Watcher_Validation
+    last_start: "10/02/2026 23:38:32"
+    last_end: null
+    st_ex: RU
+    run_ntry: "753378750/1"
+    pri_xit: null
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_MF_ACQA_TO_RA_POS_Watcher_Validation
+    last_start: "10/02/2026 23:38:34"
+    last_end: null
+    st_ex: RU
+    run_ntry: "753378750/1"
+    pri_xit: null
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_MF_ACQA_TO_RA_STATIC_Watcher_Validation
+    last_start: "10/02/2026 23:38:33"
+    last_end: null
+    st_ex: RU
+    run_ntry: "753378750/1"
+    pri_xit: null
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_Non_Cash_Collateral_Validate
+    last_start: "10/03/2026 04:11:47"
+    last_end: "10/03/2026 04:11:50"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_ClearedPositions_Validate
+    last_start: "10/03/2026 05:27:14"
+    last_end: "10/03/2026 05:27:19"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_Cash_Collateral_Validate
+    last_start: "10/03/2026 04:14:32"
+    last_end: "10/03/2026 04:14:34"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_IM_GED_Validate
+    last_start: "10/03/2026 03:46:44"
+    last_end: "10/03/2026 03:46:47"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London
+
+  - job_name: IB_CT_CVA_1109_U1_DP_ADP_IM_OCC_Validate
+    last_start: "10/05/2026 09:29:27"
+    last_end: "10/05/2026 09:29:28"
+    st_ex: SU
+    run_ntry: "753378750/1"
+    pri_xit: "0"
+    timezone: London

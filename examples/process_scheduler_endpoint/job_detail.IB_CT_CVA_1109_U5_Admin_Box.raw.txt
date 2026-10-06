@@ -1,0 +1,23 @@
+Job: IB_CT_CVA_1109_U5_Admin_Box (box)
+status      : Failed
+job type    : Box
+box         : DataPlatform_20261001_Friday
+schedule    : Tuesday,Wednesday,Thursday,Friday,Saturday
+start at    : 00:01
+last start  : 2026-10-02 11:32:38.207386+02:00
+last finish : 2026-10-02 11:48:30.126616+02:00
+
+raw wire fields (everything the server sent for this job):
+Box: DataPlatform_20261001_Friday
+ConditionExpression: None
+Context: DataPlatform_20261001_Friday
+Description: None
+JobType: Box
+LastFinishTime: 2026-10-02T11:48:30.1266164+02:00
+LastStartTime: 2026-10-02T11:32:38.2073862+02:00
+Name: IB_CT_CVA_1109_U5_Admin_Box
+Owner: None
+Schedule: Tuesday,Wednesday,Thursday,Friday,Saturday
+StartAtTime: 00:01
+StartAtTimeForce: false
+Status: Failed

@@ -10,6 +10,17 @@ The comparison engine determines whether an AutoSys workload and a Process Sched
 
 Jobs are paired by logical identity. Ambiguous identities are never auto-selected.
 
+Identity resolution priority is:
+
+1. explicit scheduler-to-scheduler mappings;
+2. configured legacy regex mappings;
+3. structured cross-environment job-name identity;
+4. legacy exact/normalized-name fallback.
+
+For structured scheduler names, the cross-environment identity is composed from the four-digit business code plus the job-specific remainder. The embedded environment token is excluded, so the same business job can match across environments. The business code is never removed: jobs from different business groups must not match even if their remaining name is identical. Likewise, a different job-specific remainder produces a different identity.
+
+The embedded environment token is interpreted structurally and is not required to equal the connection-catalog environment code because scheduler names may use environment aliases.
+
 ### Topology Containment
 
 `parent_uid` represents structural membership only. For matched jobs, the engine compares the logical identity of the parent as synthetic field `topology_parent`.

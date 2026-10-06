@@ -35,6 +35,26 @@
     </dl>
   </div>
 
+
+  {% if job.process_scheduler %}
+  <div class="box__section box__pad">
+    <p class="box-field-label">Process Scheduler source detail</p>
+    <dl class="job-detail-dl">
+      {% for key, value in job.process_scheduler.model_dump(by_alias=True).items() %}
+      <dt>{{ key }}</dt>
+      <dd>
+        {% if value is none or value == '' %}—
+        {% elif key in ['LastStartTime', 'LastFinishTime'] and value %}
+        {{ value.strftime('%Y-%m-%d %H:%M:%S') if value.strftime is defined else value }}
+        {% elif key in ['Name', 'Box', 'Context', 'ConditionExpression', 'Schedule', 'StartAtTime'] %}
+        <code>{{ value }}</code>
+        {% else %}{{ value }}{% endif %}
+      </dd>
+      {% endfor %}
+    </dl>
+  </div>
+  {% endif %}
+
   <div class="box__section box__pad">
     <p class="box-field-label">JIL definition</p>
     <dl class="job-detail-dl">

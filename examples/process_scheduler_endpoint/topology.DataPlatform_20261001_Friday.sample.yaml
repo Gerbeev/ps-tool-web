@@ -1,0 +1,150 @@
+source: ps-tool Browse v1.0.0
+source_missing_value: "-"
+environment:
+  code: U5
+  name: "U5 (UAT)"
+  wcf_address: "npb14716831u5p1.ubscloud-prod.msad.ubs.net:9001"
+topology:
+  selected_input: "2"
+  name: DataPlatform_20261001_Friday
+  revision: 0
+  snapshot_time: "2026-10-04 13:44:14.737000+00:00"
+status_summary:
+  Inactive: 815
+  Activated: 661
+  Starting: 0
+  Running: 260
+  Success: 219
+  Terminated: 0
+  Failed: 69
+  Waiting: 162
+  Cancelled: 91
+  OnIce: 93
+  OnHold: 0
+pagination:
+  displayed_line_count: "20/2371 lines"
+  visible_job_rows: 19
+  total_job_rows: 2370
+  page_is_partial: true
+columns:
+  - KIND
+  - NAME
+  - STATUS
+  - LAST START
+  - LAST FINISH
+  - MACHINE
+jobs:
+  - kind: BOX
+    name: DataPlatform_20261001_Friday
+    status: Running
+    last_start: "2026-10-02 11:32:37+02:00"
+    last_finish: null
+    machine: null
+  - kind: BOX
+    name: IB_CT_CVA_1109_U5_Admin_Box
+    status: Failed
+    last_start: "2026-10-02 11:32:38+02:00"
+    last_finish: "2026-10-02 11:48:30+02:00"
+    machine: null
+  - kind: BOX
+    name: IB_CT_CVA_1109_U5_Admin_HouseKeeping_Box
+    status: Failed
+    last_start: "2026-10-02 11:32:38+02:00"
+    last_finish: "2026-10-02 11:49:31+02:00"
+    machine: null
+  - kind: BOX
+    name: IB_CT_CVA_1109_U5_Broil_Official_FitterSet_Box
+    status: Running
+    last_start: "2026-10-02 11:32:38+02:00"
+    last_finish: null
+    machine: null
+  - kind: BOX
+    name: IB_CT_CVA_1109_U5_Broil_official_Resets_Box
+    status: Running
+    last_start: "2026-10-02 11:32:38+02:00"
+    last_finish: null
+    machine: null
+  - kind: BOX
+    name: IB_CT_CVA_1109_U5_CTDCOC_AUDIT_Box
+    status: Running
+    last_start: "2026-10-02 11:32:38+02:00"
+    last_finish: null
+    machine: null
+  - kind: BOX
+    name: IB_CT_CVA_1109_U5_CTDCOC_Wkd_RMT_Box
+    status: OnIce
+    last_start: null
+    last_finish: "2026-10-02 11:32:38+02:00"
+    machine: null
+  - kind: BOX
+    name: IB_CT_CVA_1109_U5_CVA_AUDIT_Box
+    status: Running
+    last_start: "2026-10-02 11:32:38+02:00"
+    last_finish: null
+    machine: null
+  - kind: BOX
+    name: IB_CT_CVA_1109_U5_CVA_QuarterEnd_RMT_Box
+    status: Failed
+    last_start: "2026-10-02 11:32:45+02:00"
+    last_finish: "2026-10-02 11:33:54+02:00"
+    machine: null
+  - kind: BOX
+    name: IB_CT_CVA_1109_U5_CheckRoll_Audit_Run_Box
+    status: Running
+    last_start: "2026-10-02 11:32:38+02:00"
+    last_finish: null
+    machine: null
+  - kind: BOX
+    name: IB_CT_CVA_1109_U5_DP_ADP_Box
+    status: Running
+    last_start: "2026-10-02 11:32:39+02:00"
+    last_finish: null
+    machine: null
+  - kind: BOX
+    name: IB_CT_CVA_1109_U5_DP_ADP_Rec_Box
+    status: Activated
+    last_start: null
+    last_finish: null
+    machine: null
+  - kind: BOX
+    name: IB_CT_CVA_1109_U5_DP_Adjusted_Spreads_Box
+    status: Running
+    last_start: "2026-10-02 11:32:39+02:00"
+    last_finish: null
+    machine: null
+  - kind: BOX
+    name: IB_CT_CVA_1109_U5_DP_Affiliate_Broker_Rxm_Box
+    status: Activated
+    last_start: null
+    last_finish: null
+    machine: null
+  - kind: BOX
+    name: IB_CT_CVA_1109_U5_DP_Alpine_FMM_Curves_Box
+    status: Running
+    last_start: "2026-10-02 11:32:39+02:00"
+    last_finish: null
+    machine: null
+  - kind: BOX
+    name: IB_CT_CVA_1109_U5_DP_Arisk_Imci_Box
+    status: Running
+    last_start: "2026-10-02 11:32:39+02:00"
+    last_finish: null
+    machine: null
+  - kind: BOX
+    name: IB_CT_CVA_1109_U5_DP_Box
+    status: Running
+    last_start: "2026-10-02 11:32:38+02:00"
+    last_finish: null
+    machine: null
+  - kind: BOX
+    name: IB_CT_CVA_1109_U5_DP_CTP_Box
+    status: Failed
+    last_start: "2026-10-02 11:32:41+02:00"
+    last_finish: "2026-10-02 11:33:31+02:00"
+    machine: null
+  - kind: BOX
+    name: IB_CT_CVA_1109_U5_DP_CTP_Rec_Box
+    status: Cancelled
+    last_start: null
+    last_finish: null
+    machine: null

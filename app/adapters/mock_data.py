@@ -10,6 +10,7 @@ from app.adapters.example_jobs import (
     load_autosys_example_jobs,
     load_ps_example_jobs,
 )
+from app.mock_reference import build_reference_snapshot, reference_mock_enabled, reference_topology_names
 from app.models import (
     ComparisonContext,
     DependencyEdge,
@@ -235,13 +236,15 @@ def build_large_ps_snapshot(context: ComparisonContext, job_count: int) -> Topol
 
 
 def build_autosys_snapshot(context: ComparisonContext) -> TopologySnapshot:
-    """Realistic Risk Analytics AutoSys box tree for demos."""
+    """Build the configured AutoSys mock snapshot."""
     settings = get_settings()
     if settings.mock_job_count > 0:
         return apply_root_scope(
             build_large_autosys_snapshot(context, settings.mock_job_count),
             context.filters.root_box,
         )
+    if reference_mock_enabled():
+        return apply_root_scope(build_reference_snapshot(context), context.filters.root_box)
     base = _parse_business_date(context)
     side = "left"
     business_date = context.as_of.value or base.strftime("%Y-%m-%d")
@@ -591,6 +594,9 @@ def build_ps_snapshot(context: ComparisonContext) -> TopologySnapshot:
     if settings.mock_job_count > 0:
         scoped = context.filters.root_box or context.filters.topology_id
         return apply_root_scope(build_large_ps_snapshot(context, settings.mock_job_count), scoped)
+    if reference_mock_enabled():
+        scoped = context.filters.root_box or context.filters.topology_id
+        return apply_root_scope(build_reference_snapshot(context), scoped)
     topo_id = _ps_topology_id(context)
     if topo_id == "risk_weekly_topology":
         snap = build_ps_weekly_snapshot(context)
@@ -601,4 +607,6 @@ def build_ps_snapshot(context: ComparisonContext) -> TopologySnapshot:
 
 
 def list_ps_topology_names() -> list[str]:
+    if reference_mock_enabled():
+        return reference_topology_names()
     return ["risk_daily_topology", "risk_weekly_topology"]

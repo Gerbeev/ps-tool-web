@@ -10,6 +10,7 @@ from uuid import uuid4
 from pydantic import AliasChoices, BaseModel, ConfigDict, Field
 
 from app.autosys_reference import AutoSysJobReference
+from app.process_scheduler_reference import ProcessSchedulerJobReference
 
 
 class SchedulerType(str, Enum):
@@ -138,6 +139,7 @@ class SnapshotJob(BaseModel):
     duration_sec: float | None = None
     exit_code: int | None = None
     autosys: AutoSysJobReference = Field(default_factory=AutoSysJobReference)
+    process_scheduler: ProcessSchedulerJobReference | None = None
     attributes: dict[str, Any] = Field(default_factory=dict)
     comparison_support: dict[str, FieldSupport] = Field(default_factory=dict)
     comparison_evidence: dict[str, FieldEvidence] = Field(default_factory=dict)

@@ -112,3 +112,9 @@ Benefits of keeping this boundary:
 - no coupling to Cosmos containers/partition keys/schema migrations;
 - endpoint remains responsible for interpreting its own C# domain model;
 - the comparison engine remains portable and testable using synthetic endpoint fixtures.
+
+## Process Scheduler full-job detail
+
+The observed Process Scheduler detail response is now represented by `ProcessSchedulerJobReference` on `SnapshotJob.process_scheduler`. Real Process Scheduler adapters should populate this typed source object before building parity projections. The currently observed wire fields are `Box`, `ConditionExpression`, `Context`, `Description`, `JobType`, `LastFinishTime`, `LastStartTime`, `Name`, `Owner`, `Schedule`, `StartAtTime`, `StartAtTimeForce`, and `Status`. Unknown future DTO fields are preserved by the source model.
+
+Do not treat the native source object itself as comparison truth. Project only verified semantic equivalents into normalized runtime fields / `autosys` parity fields. In particular, `Context` and `StartAtTimeForce` have no assumed AutoSys equivalent, and `Box` / `ConditionExpression` must not be used to invent containment or dependency edges until nested/non-null examples establish their exact endpoint semantics.

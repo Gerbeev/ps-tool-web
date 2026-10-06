@@ -1,0 +1,65 @@
+# Scheduler job naming convention used for cross-environment identity normalization.
+# Keep this file generic: do not store concrete business codes, environment values,
+# job names, or the literal shared prefix here.
+version: 1
+
+scope: scheduler_job_name
+separator: "_"
+
+structure:
+  order:
+    - common_prefix
+    - business_code
+    - environment
+    - job_specific_name
+
+  common_prefix:
+    description: Fixed prefix shared by scheduler jobs covered by this convention.
+    literal: null
+    must_be_consistent: true
+    identity_role: validate_only
+
+  business_code:
+    description: Four-digit application/business identifier.
+    format: digits
+    length: 4
+    identity_role: include
+
+  environment:
+    description: Environment identifier embedded in the scheduler job name.
+    accepted_lengths:
+      - 2
+      - 4
+    format: uppercase_alphanumeric
+    identity_role: exclude_for_cross_environment_matching
+
+  job_specific_name:
+    description: Remaining scheduler job name after the environment token.
+    format: non_empty_remainder
+    identity_role: include
+
+parsing:
+  # The prefix may itself contain separators. The business code is therefore the
+  # first structural anchor: a 4-digit token followed by an environment token.
+  generic_regex: '^(?P<common_prefix>.+_)(?P<business_code>\d{4})_(?P<environment>[A-Z0-9]{2}|[A-Z0-9]{4})_(?P<job_specific_name>.+)$'
+  require_full_match: true
+  validate_environment_against_config: false
+  on_parse_failure: unresolved
+
+cross_environment_identity:
+  description: Canonical identity used when comparing the same business job across environments.
+  include:
+    - business_code
+    - job_specific_name
+  exclude:
+    - common_prefix
+    - environment
+  require_same_business_code: true
+  compare_job_specific_name: normalized_exact
+
+normalization:
+  preserve_business_code: true
+  remove_environment_token: true
+  remove_common_prefix_from_identity: true
+  job_specific_name_case_sensitive: true
+  trim_outer_whitespace: true

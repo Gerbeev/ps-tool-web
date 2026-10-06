@@ -1,4 +1,4 @@
-"""Application configuration loaded from env and YAML."""
+"""Application configuration loaded from env and scheduler-specific YAML files."""
 
 from __future__ import annotations
 
@@ -15,21 +15,32 @@ def _repo_root() -> Path:
 
 
 class EnvironmentEntry(BaseModel):
+    """One scheduler environment/connection definition.
+
+    ``endpoint_url`` remains the internal canonical field used by adapters and contexts.
+    Scheduler-specific YAML files intentionally persist it as ``host`` because that is
+    the native operator-facing terminology for the captured Process Scheduler data.
+    """
+
     id: str
+    environment: str = ""
     display_name: str
+    description: str = ""
     region: str | None = None
     connector_profile: str | None = None
-    """autosys | process_scheduler — default scheduler when this env is selected."""
     scheduler: str | None = None
-    """Base URL of the bank-internal scheduler endpoint used by this adapter."""
     endpoint_url: str = Field(
         default="",
         validation_alias=AliasChoices("endpoint_url", "host"),
     )
+    transport: str = ""
+    enabled: bool = True
+    source: str = ""
+    notes: str = ""
 
     @property
     def host(self) -> str:
-        """Backward-compatible alias; endpoint_url is the canonical field."""
+        """Operator-facing alias for the configured connection target."""
         return self.endpoint_url
 
 
@@ -55,6 +66,39 @@ class IdentityMapConfig(BaseModel):
     normalize: IdentityNormalize = Field(default_factory=IdentityNormalize)
 
 
+class JobNamingParsing(BaseModel):
+    generic_regex: str
+    require_full_match: bool = True
+    validate_environment_against_config: bool = False
+    on_parse_failure: str = "unresolved"
+
+
+class CrossEnvironmentIdentity(BaseModel):
+    include: list[str] = Field(default_factory=lambda: ["business_code", "job_specific_name"])
+    exclude: list[str] = Field(default_factory=lambda: ["common_prefix", "environment"])
+    require_same_business_code: bool = True
+    compare_job_specific_name: str = "normalized_exact"
+
+
+class JobNamingNormalization(BaseModel):
+    preserve_business_code: bool = True
+    remove_environment_token: bool = True
+    remove_common_prefix_from_identity: bool = True
+    job_specific_name_case_sensitive: bool = True
+    trim_outer_whitespace: bool = True
+
+
+class JobNamingRulesConfig(BaseModel):
+    version: int = 1
+    scope: str = "scheduler_job_name"
+    separator: str = "_"
+    parsing: JobNamingParsing
+    cross_environment_identity: CrossEnvironmentIdentity = Field(
+        default_factory=CrossEnvironmentIdentity
+    )
+    normalization: JobNamingNormalization = Field(default_factory=JobNamingNormalization)
+
+
 class AppSettings(BaseModel):
     host: str = "127.0.0.1"
     port: int = 8000
@@ -64,7 +108,10 @@ class AppSettings(BaseModel):
     snapshot_cache_ttl_sec: int = 180
     search_db_path: Path = Field(default_factory=lambda: _repo_root() / "data" / "search.db")
     use_mock_adapters: bool = True
+    allow_connection_config_edit: bool = True
     mock_job_count: int = 0
+    mock_dataset: str = "reference_2500"
+    mock_reference_path: Path = Field(default_factory=lambda: _repo_root() / "data" / "mock" / "reference_topology_2500.jsonl")
     table_page_size_default: int = 0  # 0 = show all rows on first load
 
 
@@ -80,27 +127,76 @@ def get_settings() -> AppSettings:
         snapshot_cache_ttl_sec=int(os.getenv("SNAPSHOT_CACHE_TTL_SEC", "180")),
         search_db_path=Path(os.getenv("SEARCH_DB_PATH", str(root / "data" / "search.db"))),
         use_mock_adapters=os.getenv("USE_MOCK_ADAPTERS", "true").lower() in ("1", "true", "yes"),
+        allow_connection_config_edit=os.getenv("ALLOW_CONNECTION_CONFIG_EDIT", "true").lower()
+        in ("1", "true", "yes"),
         mock_job_count=int(os.getenv("MOCK_JOB_COUNT", "0")),
+        mock_dataset=os.getenv("MOCK_DATASET", "reference_2500").strip().lower(),
+        mock_reference_path=Path(
+            os.getenv(
+                "MOCK_REFERENCE_PATH",
+                str(root / "data" / "mock" / "reference_topology_2500.jsonl"),
+            )
+        ),
         table_page_size_default=int(os.getenv("TABLE_PAGE_SIZE", "0")),
     )
 
 
-@lru_cache
-def load_environments() -> list[EnvironmentEntry]:
-    path = get_settings().config_dir / "environments.yaml"
+def _scheduler_config_filename(scheduler: str) -> str:
+    if scheduler == "process_scheduler":
+        return "process_scheduler_environments.yaml"
+    if scheduler == "autosys":
+        return "autosys_environments.yaml"
+    raise ValueError(f"Unsupported scheduler: {scheduler!r}")
+
+
+def scheduler_config_path(scheduler: str) -> Path:
+    return get_settings().config_dir / _scheduler_config_filename(scheduler)
+
+
+def _load_environment_file(path: Path, scheduler: str) -> list[EnvironmentEntry]:
     if not path.exists():
         return []
     with path.open(encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
-    return [EnvironmentEntry.model_validate(e) for e in data.get("environments", [])]
+    entries: list[EnvironmentEntry] = []
+    for raw in data.get("environments", []):
+        payload = dict(raw)
+        payload.setdefault("scheduler", scheduler)
+        payload.setdefault("environment", payload.get("id", ""))
+        payload.setdefault("display_name", payload.get("environment") or payload.get("id", ""))
+        entries.append(EnvironmentEntry.model_validate(payload))
+    return entries
+
+
+@lru_cache
+def load_scheduler_environments(scheduler: str) -> list[EnvironmentEntry]:
+    """Load all configured entries for one scheduler, including disabled entries."""
+    return _load_environment_file(scheduler_config_path(scheduler), scheduler)
+
+
+@lru_cache
+def load_all_environments() -> list[EnvironmentEntry]:
+    """Load all scheduler-specific environments for Settings and direct lookup."""
+    return [
+        *load_scheduler_environments("autosys"),
+        *load_scheduler_environments("process_scheduler"),
+    ]
+
+
+@lru_cache
+def load_environments() -> list[EnvironmentEntry]:
+    """Load enabled environments exposed to Browse/Compare."""
+    return [entry for entry in load_all_environments() if entry.enabled]
 
 
 def invalidate_environment_cache() -> None:
+    load_scheduler_environments.cache_clear()
+    load_all_environments.cache_clear()
     load_environments.cache_clear()
 
 
 def get_environment(environment_id: str) -> EnvironmentEntry | None:
-    for entry in load_environments():
+    for entry in load_all_environments():
         if entry.id == environment_id:
             return entry
     return None
@@ -112,7 +208,7 @@ def endpoint_for_environment(environment_id: str) -> str:
 
 
 def host_for_environment(environment_id: str) -> str:
-    """Backward-compatible alias for older callers/configuration."""
+    """Backward-compatible alias for callers that still use ``host`` terminology."""
     return endpoint_for_environment(environment_id)
 
 
@@ -136,20 +232,50 @@ def resolve_scheduler(entry: EnvironmentEntry):
     return SchedulerType.AUTOSYS
 
 
-def save_environments(entries: list[EnvironmentEntry]) -> None:
-    path = get_settings().config_dir / "environments.yaml"
+def _environment_to_yaml(entry: EnvironmentEntry) -> dict:
+    """Persist operator-facing keys in a stable, human-editable order."""
+    payload: dict[str, object] = {
+        "id": entry.id,
+        "environment": entry.environment,
+        "host": entry.endpoint_url,
+        "description": entry.description,
+        "display_name": entry.display_name,
+        "transport": entry.transport,
+        "connector_profile": entry.connector_profile or "",
+        "enabled": entry.enabled,
+    }
+    if entry.region:
+        payload["region"] = entry.region
+    if entry.source:
+        payload["source"] = entry.source
+    if entry.notes:
+        payload["notes"] = entry.notes
+    return payload
+
+
+def save_scheduler_environments(scheduler: str, entries: list[EnvironmentEntry]) -> None:
+    path = scheduler_config_path(scheduler)
     path.parent.mkdir(parents=True, exist_ok=True)
     payload = {
-        "environments": [
-            {k: v for k, v in entry.model_dump().items() if v is not None and v != ""}
-            for entry in entries
-        ]
+        "scheduler": scheduler,
+        "environments": [_environment_to_yaml(entry) for entry in entries],
     }
-    header = "# Environment definitions — endpoint & scheduler editable in Settings UI\n"
+    header = (
+        f"# {scheduler.replace('_', ' ').title()} environment connections.\n"
+        "# Editable from Settings; secrets/credentials must not be stored here.\n"
+    )
     with path.open("w", encoding="utf-8") as f:
         f.write(header)
         yaml.safe_dump(payload, f, sort_keys=False, allow_unicode=True, default_flow_style=False)
     invalidate_environment_cache()
+
+
+def save_environments(entries: list[EnvironmentEntry]) -> None:
+    """Compatibility helper: split a mixed list into scheduler-specific files."""
+    autosys = [e for e in entries if resolve_scheduler(e).value == "autosys"]
+    process_scheduler = [e for e in entries if resolve_scheduler(e).value == "process_scheduler"]
+    save_scheduler_environments("autosys", autosys)
+    save_scheduler_environments("process_scheduler", process_scheduler)
 
 
 @lru_cache
@@ -160,3 +286,20 @@ def load_identity_map() -> IdentityMapConfig:
     with path.open(encoding="utf-8") as f:
         data = yaml.safe_load(f) or {}
     return IdentityMapConfig.model_validate(data)
+
+
+@lru_cache
+def load_job_naming_rules() -> JobNamingRulesConfig | None:
+    """Load the optional structured scheduler job naming contract.
+
+    The contract is intentionally scheduler-agnostic: the embedded environment token
+    is part of a native job name but is excluded from cross-environment identity.
+    """
+    path = get_settings().config_dir / "job_naming_rules.yaml"
+    if not path.exists():
+        return None
+    with path.open(encoding="utf-8") as f:
+        data = yaml.safe_load(f) or {}
+    if not data:
+        return None
+    return JobNamingRulesConfig.model_validate(data)
