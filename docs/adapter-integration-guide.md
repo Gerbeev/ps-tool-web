@@ -17,7 +17,7 @@ The three workstation implementation files are local-only and git-ignored. The w
 
 ## Snapshot-only source access
 
-In the web application, real source calls are initiated only from the **Snapshots** workflow. AutoSys snapshot generation performs `fetch_topology` for the current business date. Process Scheduler first uses `list_roots` to populate the topology selector, then uses `fetch_topology` for the selected topology. Browse, Compare, Search, and Export consume persisted snapshots and must never call the bridge.
+In the web application, real source calls are initiated only from the **Snapshots** workflow. AutoSys snapshot generation performs `fetch_topology` for the previous local calendar day (COB = today - 1 day). Process Scheduler first uses `list_roots` to populate the topology selector, then uses `fetch_topology` for the selected topology. Browse, Compare, Search, and Export consume persisted snapshots and must never call the bridge.
 
 ## What source-specific code may do
 

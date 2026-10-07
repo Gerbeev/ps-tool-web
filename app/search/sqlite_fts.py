@@ -17,6 +17,9 @@ class SearchIndex(ABC):
     def rebuild(self, snapshot: TopologySnapshot, side: str) -> None: ...
 
     @abstractmethod
+    def delete_snapshot(self, snapshot_id: str) -> None: ...
+
+    @abstractmethod
     def search(
         self,
         query: str,
@@ -116,6 +119,13 @@ class SQLiteFTSSearchIndex(SearchIndex):
                 VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
                 rows,
+            )
+
+    def delete_snapshot(self, snapshot_id: str) -> None:
+        with self._lock, self._conn:
+            self._conn.execute(
+                "DELETE FROM jobs_fts WHERE snapshot_id = ?",
+                (snapshot_id,),
             )
 
     def search(

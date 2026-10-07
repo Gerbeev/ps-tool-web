@@ -23,7 +23,7 @@ Never add `bank_autosys*.py`, `bank_process_scheduler*.py`, dynamic adapter impo
 
 `Snapshots` is the only web workflow allowed to access scheduler sources.
 
-- AutoSys: choose environment, capture the current business date.
+- AutoSys: choose environment, capture the previous local calendar day as COB (today - 1 day).
 - Process Scheduler: choose environment, call `list_roots` through the bridge, select an existing topology, then capture it.
 - Every successful capture becomes a new immutable catalog entry with its own `snapshot_id`.
 - Runtime snapshot files live under `SNAPSHOT_DIR` and are git-ignored.

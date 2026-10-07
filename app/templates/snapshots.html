@@ -12,7 +12,7 @@
   <div class="box">
     <div class="box__section box__pad">
       <h2>Generate snapshot</h2>
-      <p class="muted box-lead">Choose an environment. AutoSys captures the current business date; Process Scheduler captures one topology selected from the source system.</p>
+      <p class="muted box-lead">Choose an environment. AutoSys captures the previous calendar day as COB; Process Scheduler captures one topology selected from the source system.</p>
     </div>
     <div class="box__section box__pad">
       <form id="snapshot-generate-form"
@@ -31,7 +31,7 @@
                     hx-target="#snapshot-source-fields"
                     hx-include="#snapshot-environment">
               {% for env in environments %}
-              <option value="{{ env.id }}" {% if env.id == environment_id %}selected{% endif %}>{{ env.display_name }}</option>
+              <option value="{{ env.id }}" {% if env.id == environment_id %}selected{% endif %}>{{ env.label }}</option>
               {% endfor %}
             </select>
           </label>

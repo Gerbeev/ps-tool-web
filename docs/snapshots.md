@@ -23,7 +23,7 @@ Browse and Compare must not import `get_adapter`, `fetch_snapshot`, `ExternalBri
 
 ## AutoSys generation
 
-AutoSys generation accepts only an environment. The application creates a `ComparisonContext` using the current local business date and asks the configured adapter for a topology snapshot. There is no business-date selector in Browse or Compare; the captured date is part of the immutable snapshot metadata.
+AutoSys generation accepts only an environment. The application creates a `ComparisonContext` using the previous local calendar day as COB (`today - 1 day`) and asks the configured adapter for a topology snapshot. There is no business-date selector in Browse or Compare; the captured date is part of the immutable snapshot metadata.
 
 ## Process Scheduler generation
 
@@ -69,3 +69,11 @@ A snapshot whose payload is missing or fails its checksum is rejected when Brows
 This boundary is deliberate for the bank-workstation deployment model. The web project can evolve independently while the workstation connector scripts remain fixed behind `scheduler-bridge/v1`.
 
 The test suite contains an explicit regression test that generates snapshots, replaces the adapter factory with a function that raises immediately, and then verifies that Browse and Compare still work. This guards against accidental live-source access being reintroduced later.
+
+
+## Snapshot naming and deletion
+
+- AutoSys display name: `<ENV>-AutoSys_<YYYY-MM-DD>_<HH-MM-SS>` using local capture time.
+- Process Scheduler display name: `<ENV>-ProcessScheduler_<YYYY-MM-DD>_<TOPOLOGY>` using local capture date.
+- AutoSys source `business_date` is always the previous local calendar day (`today - 1 day`).
+- Snapshots can be deleted only from the Snapshots tab; deletion removes both the catalog entry and payload file.

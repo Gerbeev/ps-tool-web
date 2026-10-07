@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import date
+from datetime import date, timedelta
 
 from app.adapters.factory import get_adapter
 from app.config import endpoint_for_environment, get_environment, scheduler_for_environment
@@ -14,6 +14,12 @@ from app.services.snapshot_catalog import SnapshotRecord, snapshot_catalog
 
 class SnapshotGenerationError(RuntimeError):
     pass
+
+
+def autosys_business_date(today: date | None = None) -> str:
+    """Return the AutoSys COB date: local calendar date minus one day."""
+    current = today or date.today()
+    return (current - timedelta(days=1)).isoformat()
 
 
 @dataclass(frozen=True)
@@ -53,13 +59,14 @@ def list_process_scheduler_topologies(environment_id: str) -> list[str]:
 def generate_snapshot(environment_id: str, *, topology_id: str = "") -> GeneratedSnapshot:
     """Fetch one source snapshot, validate it, then persist it immutably."""
     _environment, scheduler = _require_environment(environment_id)
-    today = date.today().isoformat()
     filters = ContextFilters()
 
     if scheduler == SchedulerType.AUTOSYS:
+        business_date = autosys_business_date()
         if topology_id:
             raise SnapshotGenerationError("AutoSys snapshot generation does not accept a topology")
     else:
+        business_date = date.today().isoformat()
         topology_id = topology_id.strip()
         if not topology_id:
             raise SnapshotGenerationError("Select a Process Scheduler topology")
@@ -70,7 +77,7 @@ def generate_snapshot(environment_id: str, *, topology_id: str = "") -> Generate
         environment_id=environment_id,
         endpoint_url=endpoint_for_environment(environment_id),
         scheduler=scheduler,
-        as_of=AsOf(kind=AsOfKind.BUSINESS_DATE, value=today),
+        as_of=AsOf(kind=AsOfKind.BUSINESS_DATE, value=business_date),
         filters=filters,
     )
 

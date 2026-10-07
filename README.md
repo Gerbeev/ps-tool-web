@@ -106,12 +106,13 @@ The **Snapshots** view is the single ingress point for external scheduler data. 
 Users can:
 
 - Select an enabled scheduler environment.
-- Generate an AutoSys snapshot for the current business date.
+- Generate an AutoSys snapshot for the previous local calendar day (COB = today - 1 day).
 - For Process Scheduler, load the environment's topology list through the bridge, select one topology, and generate a snapshot for it.
 - Keep multiple immutable snapshots for the same environment/topology across different captures.
-- See the generated snapshot catalog, including capture time, source scope, job/dependency counts, and snapshot ID.
+- See the generated snapshot catalog, including human-readable snapshot name, capture time, source scope, job/dependency counts, and snapshot ID.
+- Delete generated snapshots from the catalog when they are no longer needed.
 
-Every successful capture is validated and stored under `SNAPSHOT_DIR` (default `data/runtime/snapshots`). A failed capture does not modify existing snapshots.
+Every successful capture is validated and stored under `SNAPSHOT_DIR` (default `data/runtime/snapshots`). A failed capture does not modify existing snapshots. Snapshot names are generated as `ENV-AutoSys_YYYY-MM-DD_HH-MM-SS` or `ENV-ProcessScheduler_YYYY-MM-DD_TOPOLOGY`; the payload itself remains keyed by immutable UUID. Deleting a snapshot removes its catalog record, payload, and local search-index rows without contacting a scheduler source.
 
 ### Browse
 
@@ -246,7 +247,7 @@ Compare       -> snapshot catalog only
 Search/export -> loaded snapshot sessions/catalog only
 ```
 
-For AutoSys, generation fixes the source context to the current business date. For Process Scheduler, the Snapshots view first requests available topologies through `list_roots`, then fetches only the selected topology. Browse and Compare expose neither business-date nor topology source controls because those choices are already frozen into the selected snapshot.
+For AutoSys, generation fixes the source context to the previous local calendar day (COB = today - 1 day). For Process Scheduler, the Snapshots view first requests available topologies through `list_roots`, then fetches only the selected topology. Browse and Compare expose neither business-date nor topology source controls because those choices are already frozen into the selected snapshot.
 
 This separation is the main source-isolation contract: replacing or refactoring Browse/Compare must not introduce adapter or bridge calls. See `docs/snapshots.md`.
 

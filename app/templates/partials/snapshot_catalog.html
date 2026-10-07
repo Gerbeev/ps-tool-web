@@ -1,3 +1,13 @@
+{% if deleted %}
+<div class="box__section box__pad snapshot-success">
+  <p><strong>Snapshot deleted.</strong> {{ deleted.label }}</p>
+</div>
+{% endif %}
+{% if catalog_error %}
+<div class="box__section box__pad snapshot-error">
+  <p><strong>Snapshot operation failed.</strong> {{ catalog_error }}</p>
+</div>
+{% endif %}
 {% if generated %}
 <div class="box__section box__pad snapshot-success">
   <p><strong>Snapshot generated.</strong> {{ generated.label }}</p>
@@ -21,6 +31,7 @@
   <table class="snapshot-table">
     <thead>
       <tr>
+        <th>Name</th>
         <th>Captured</th>
         <th>Environment</th>
         <th>Scheduler</th>
@@ -28,18 +39,28 @@
         <th>Jobs</th>
         <th>Dependencies</th>
         <th>Snapshot ID</th>
+        <th></th>
       </tr>
     </thead>
     <tbody>
       {% for item in snapshots %}
       <tr>
+        <td><strong>{{ item.label }}</strong></td>
         <td>{{ item.captured_at.strftime('%Y-%m-%d %H:%M:%S') }}</td>
-        <td>{{ item.environment_id }}</td>
+        <td>{{ item.environment_name or item.environment_id }}</td>
         <td>{% if item.scheduler.value == 'autosys' %}AutoSys{% else %}Process Scheduler{% endif %}</td>
         <td>{{ item.source_scope }}</td>
         <td>{{ item.job_count }}</td>
         <td>{{ item.edge_count }}</td>
         <td><code>{{ item.snapshot_id }}</code></td>
+        <td>
+          <form hx-post="/api/snapshots/delete"
+                hx-target="#snapshots-workspace"
+                hx-confirm="Delete snapshot '{{ item.label }}'? This cannot be undone.">
+            <input type="hidden" name="snapshot_id" value="{{ item.snapshot_id }}">
+            <button type="submit" class="btn--danger">Delete</button>
+          </form>
+        </td>
       </tr>
       {% endfor %}
     </tbody>

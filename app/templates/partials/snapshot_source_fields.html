@@ -19,8 +19,8 @@
 {% else %}
 <div class="snapshot-source-summary">
   <p class="box-field-label">AutoSys capture</p>
-  <p><strong>{{ current_date }}</strong></p>
-  <p class="small muted box-note">Business date is fixed to the current local date for snapshot generation.</p>
+  <p><strong>{{ autosys_business_date }}</strong></p>
+  <p class="small muted box-note">AutoSys COB is fixed to the previous local calendar day (today minus 1 day).</p>
 </div>
 <input type="hidden" name="topology_id" value="">
 {% endif %}

@@ -2,7 +2,8 @@
 
 from __future__ import annotations
 
-from datetime import date, datetime, timezone
+from datetime import date, datetime, timedelta, timezone
+import re
 
 from fastapi.testclient import TestClient
 
@@ -17,6 +18,7 @@ from app.models import (
     SnapshotJob,
     TopologySnapshot,
 )
+from app.search.sqlite_fts import search_index
 from app.services.snapshot_catalog import snapshot_catalog
 from app.services.snapshot_generation import generate_snapshot, list_process_scheduler_topologies
 from app.services.topology_index import get_job
@@ -94,8 +96,12 @@ def test_snapshots_page_is_default_ingress_and_generates_both_scheduler_types():
     assert len(records) == 2
     autosys_record = next(item for item in records if item.scheduler == SchedulerType.AUTOSYS)
     ps_record = next(item for item in records if item.scheduler == SchedulerType.PROCESS_SCHEDULER)
-    assert autosys_record.business_date == date.today().isoformat()
+    assert autosys_record.business_date == (date.today() - timedelta(days=1)).isoformat()
     assert ps_record.topology_id == topology
+    assert re.fullmatch(r"U1-AutoSys_\d{4}-\d{2}-\d{2}_\d{2}-\d{2}-\d{2}", autosys_record.label)
+    assert ps_record.label == f"U5-ProcessScheduler_{date.today().isoformat()}_{topology}"
+    assert "U1-AutoSys" in page.text
+    assert "U5-PS" in page.text
 
 
 def test_browse_and_compare_use_catalog_only_after_generation(monkeypatch):
@@ -142,3 +148,29 @@ def test_non_ingress_routes_do_not_import_live_source_access():
         source = inspect.getsource(module)
         for token in banned:
             assert token not in source, f"{module.__name__} must not reference {token}"
+
+
+def test_snapshot_can_be_deleted_from_catalog_and_ui():
+    record = generate_snapshot("autosys-u1").record
+    payload = snapshot_catalog.root / record.filename
+    assert payload.exists()
+    loaded = snapshot_catalog.load(record.snapshot_id)
+    assert loaded is not None
+    snapshot, _ = loaded
+    search_index.rebuild(snapshot, "left")
+    query = snapshot.flat_jobs[0].scheduler_job_name.split("_")[0]
+    assert search_index.search(query, snapshot_ids=[record.snapshot_id])
+
+    response = client.post("/api/snapshots/delete", data={"snapshot_id": record.snapshot_id})
+    assert response.status_code == 200
+    assert "Snapshot deleted" in response.text
+    assert snapshot_catalog.get_record(record.snapshot_id) is None
+    assert not payload.exists()
+    assert search_index.search(query, snapshot_ids=[record.snapshot_id]) == []
+
+
+def test_autosys_business_date_is_previous_calendar_day():
+    from app.services.snapshot_generation import autosys_business_date
+
+    assert autosys_business_date(date(2026, 10, 7)) == "2026-10-06"
+    assert autosys_business_date(date(2026, 3, 1)) == "2026-02-28"

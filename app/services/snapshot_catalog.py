@@ -13,7 +13,7 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-from app.config import get_settings
+from app.config import get_environment, get_settings
 from app.models import ComparisonContext, SchedulerType, TopologySnapshot
 from app.services.topology_index import ensure_topology_indexes
 
@@ -23,6 +23,8 @@ class SnapshotRecord(BaseModel):
 
     schema_version: int = 1
     snapshot_id: str
+    snapshot_name: str = ""
+    environment_name: str = ""
     captured_at: datetime
     fetched_at: datetime
     scheduler: SchedulerType
@@ -43,11 +45,14 @@ class SnapshotRecord(BaseModel):
 
     @property
     def label(self) -> str:
-        scheduler = "AutoSys" if self.scheduler == SchedulerType.AUTOSYS else "Process Scheduler"
-        scope_label = "date" if self.scheduler == SchedulerType.AUTOSYS else "topology"
-        short_id = self.snapshot_id[:8]
-        captured = self.captured_at.astimezone(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-        return f"{scheduler} · {scope_label} {self.source_scope} · {captured} · {short_id}"
+        if self.snapshot_name:
+            return self.snapshot_name
+        scheduler = "AutoSys" if self.scheduler == SchedulerType.AUTOSYS else "PS"
+        environment = self.environment_name or self.environment_id
+        captured = self.captured_at.astimezone().strftime("%Y-%m-%d_%H-%M-%S")
+        if self.scheduler == SchedulerType.PROCESS_SCHEDULER:
+            return f"{environment}-{scheduler}_{self.captured_at.astimezone().date().isoformat()}_{self.source_scope}"
+        return f"{environment}-{scheduler}_{captured}"
 
 
 class SnapshotCatalogIndex(BaseModel):
@@ -113,12 +118,32 @@ class SnapshotCatalogStore:
         data = json.dumps(index.model_dump(mode="json"), indent=2, sort_keys=True).encode("utf-8")
         self._write_bytes_atomic(self.index_path, data)
 
+
+    @staticmethod
+    def _build_snapshot_name(
+        *,
+        scheduler: SchedulerType,
+        environment_name: str,
+        captured_at: datetime,
+        topology_id: str | None,
+    ) -> str:
+        local_capture = captured_at.astimezone()
+        if scheduler == SchedulerType.PROCESS_SCHEDULER:
+            return (
+                f"{environment_name}-ProcessScheduler_{local_capture.date().isoformat()}_"
+                f"{topology_id or 'topology'}"
+            )
+        return f"{environment_name}-AutoSys_{local_capture.strftime('%Y-%m-%d_%H-%M-%S')}"
+
     def save(self, snapshot: TopologySnapshot) -> SnapshotRecord:
         """Persist a new immutable snapshot and append it to the catalog."""
         data = self._snapshot_bytes(snapshot)
         snapshot_id = snapshot.snapshot_id
         filename = f"{snapshot_id}.snapshot.json.gz"
         topology_id = snapshot.context.filters.topology_id or snapshot.context.filters.root_box
+        environment = get_environment(snapshot.context.environment_id)
+        environment_name = (environment.environment if environment else snapshot.context.environment_id).strip()
+        captured_at = datetime.now(timezone.utc)
         business_date = (
             snapshot.context.as_of.value
             if snapshot.context.scheduler == SchedulerType.AUTOSYS
@@ -126,7 +151,14 @@ class SnapshotCatalogStore:
         )
         record = SnapshotRecord(
             snapshot_id=snapshot_id,
-            captured_at=datetime.now(timezone.utc),
+            snapshot_name=self._build_snapshot_name(
+                scheduler=snapshot.context.scheduler,
+                environment_name=environment_name,
+                captured_at=captured_at,
+                topology_id=topology_id,
+            ),
+            environment_name=environment_name,
+            captured_at=captured_at,
             fetched_at=snapshot.fetched_at,
             scheduler=snapshot.context.scheduler,
             environment_id=snapshot.context.environment_id,
@@ -198,6 +230,42 @@ class SnapshotCatalogStore:
             except (OSError, ValueError, TypeError, json.JSONDecodeError):
                 return None
         return snapshot, record
+
+    def delete(self, snapshot_id: str) -> SnapshotRecord | None:
+        """Delete exactly one catalog snapshot and its immutable payload."""
+        with self._lock:
+            index = self._read_index()
+            record = next((item for item in index.snapshots if item.snapshot_id == snapshot_id), None)
+            if record is None:
+                return None
+
+            filename = Path(record.filename)
+            if filename.name != record.filename or filename.suffixes[-3:] != [".snapshot", ".json", ".gz"]:
+                raise ValueError("Invalid snapshot catalog filename")
+
+            target = self.root / record.filename
+            tombstone = self.root / f".{record.filename}.{uuid4().hex}.deleting"
+            renamed = False
+            if target.exists():
+                os.replace(target, tombstone)
+                renamed = True
+
+            updated = SnapshotCatalogIndex(
+                snapshots=[item for item in index.snapshots if item.snapshot_id != snapshot_id]
+            )
+            try:
+                self._write_index(updated)
+            except Exception:
+                if renamed and tombstone.exists():
+                    os.replace(tombstone, target)
+                raise
+
+            if renamed:
+                try:
+                    tombstone.unlink()
+                except OSError:
+                    pass
+            return record
 
     def clear(self) -> None:
         """Test/admin helper. Runtime UI does not delete historical snapshots."""
