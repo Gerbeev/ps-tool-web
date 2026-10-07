@@ -2,9 +2,8 @@ import os
 
 import pytest
 
-# Existing unit/route tests exercise the compact legacy fixture unless a test explicitly
-# opts into the canonical 2500-job reference dataset. The application runtime default
-# remains reference_2500.
+# Existing unit tests exercise the compact fixture unless a test explicitly opts into
+# the canonical 2500-job dataset. Runtime default remains reference_2500.
 os.environ.setdefault("MOCK_DATASET", "legacy_small")
 
 
@@ -12,7 +11,7 @@ os.environ.setdefault("MOCK_DATASET", "legacy_small")
 def _reset_cached_settings(monkeypatch, tmp_path):
     from app.config import get_settings
 
-    monkeypatch.setenv("CURRENT_SNAPSHOT_DIR", str(tmp_path / "current-snapshot"))
+    monkeypatch.setenv("SNAPSHOT_DIR", str(tmp_path / "snapshots"))
     get_settings.cache_clear()
     yield
     get_settings.cache_clear()

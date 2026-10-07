@@ -1,6 +1,6 @@
 <div class="box__section box__pad snapshot-result-meta">
-  <p class="small"><strong>{% if snapshot_origin == 'current' %}Reused current snapshot{% else %}Captured new snapshot{% endif %}</strong> · {{ snapshot_manifest.captured_at }}</p>
-  <p class="muted small">Left fetched {{ snapshot_manifest.left.fetched_at }} · Right fetched {{ snapshot_manifest.right.fetched_at }}. Browse, table, trees and exports below use these frozen snapshots.</p>
+  <p class="small"><strong>Compared generated snapshots</strong></p>
+  <p class="muted small">Left {{ left_record.snapshot_id }} · captured {{ left_record.captured_at }} · Right {{ right_record.snapshot_id }} · captured {{ right_record.captured_at }}. No scheduler fetch was performed.</p>
 </div>
 <div class="box__section box__pad">
   {% include "partials/summary.html" %}

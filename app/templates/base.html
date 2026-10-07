@@ -1,4 +1,4 @@
-{% from 'macros/lucide_icons.html' import logo_mark, browse_icon, compare_icon, settings_icon, search_icon, sun_icon, moon_icon %}
+{% from 'macros/lucide_icons.html' import logo_mark, snapshots_icon, browse_icon, compare_icon, settings_icon, search_icon, sun_icon, moon_icon %}
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -33,6 +33,10 @@
         </button>
       </div>
       <nav class="sidebar-nav" aria-label="Primary">
+        <a href="/snapshots" class="nav-item {% if active_nav == 'snapshots' %}active{% endif %}" {% if active_nav == 'snapshots' %}aria-current="page"{% endif %} title="Snapshots">
+          <span class="nav-icon">{{ snapshots_icon() }}</span>
+          <span class="nav-label">Snapshots</span>
+        </a>
         <a href="/browse" class="nav-item {% if active_nav == 'browse' %}active{% endif %}" {% if active_nav == 'browse' %}aria-current="page"{% endif %} title="Browse">
           <span class="nav-icon">{{ browse_icon() }}</span>
           <span class="nav-label">Browse</span>

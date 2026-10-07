@@ -1,4 +1,4 @@
-"""Browse page smoke tests."""
+"""Browse page smoke tests for generated snapshots."""
 
 import re
 
@@ -6,6 +6,7 @@ from fastapi.testclient import TestClient
 
 from app.main import app
 from app.models import JobStatus
+from app.services.snapshot_generation import generate_snapshot, list_process_scheduler_topologies
 
 client = TestClient(app)
 
@@ -13,20 +14,20 @@ client = TestClient(app)
 def test_browse_page_renders():
     resp = client.get("/browse")
     assert resp.status_code == 200
-    assert "Select environment" in resp.text
+    assert "Select snapshot" in resp.text
     assert 'id="browse-env-toggle"' in resp.text
     assert 'id="browse-env-panel"' in resp.text
     assert 'hx-post="/api/browse/load"' in resp.text
+    assert 'name="snapshot_id"' in resp.text
 
 
 def test_browse_load_returns_full_width_tree_and_lazy_nodes():
+    record = generate_snapshot("autosys-u1").record
     resp = client.post(
         "/api/browse/load",
         data={
-            "environment_id": "uat-rd",
-            "scheduler": "autosys",
-            "as_of": "2026-10-02",
-            "topology": "",
+            "environment_id": record.environment_id,
+            "snapshot_id": record.snapshot_id,
         },
     )
     assert resp.status_code == 200
@@ -49,6 +50,7 @@ def test_browse_load_returns_full_width_tree_and_lazy_nodes():
     assert "browse-tree-expand-btn" in html
     assert 'hx-trigger="revealed once"' in html
     assert '<details class="browse-tree-branch" open>' in html
+    assert "No scheduler fetch was performed" in html
 
     m = re.search(r'id="session-id"[^>]*value="([^"]+)"', html)
     assert m
@@ -84,19 +86,19 @@ def test_reference_mock_job_details_work_for_autosys_and_process_scheduler(monke
     monkeypatch.setenv("MOCK_DATASET", "reference_2500")
     get_settings.cache_clear()
 
+    autosys = generate_snapshot("autosys-u1").record
+    ps = generate_snapshot("ps-u5", topology_id="DataPlatform_REFERENCE").record
     cases = [
-        ("autosys-u1", "autosys", "", "JIL definition"),
-        ("ps-u5", "process_scheduler", "DataPlatform_REFERENCE", "Process Scheduler source detail"),
+        (autosys, "JIL definition"),
+        (ps, "Process Scheduler source detail"),
     ]
 
-    for environment_id, scheduler, topology, source_section in cases:
+    for record, source_section in cases:
         loaded = client.post(
             "/api/browse/load",
             data={
-                "environment_id": environment_id,
-                "scheduler": scheduler,
-                "as_of": "2026-10-02",
-                "topology": topology,
+                "environment_id": record.environment_id,
+                "snapshot_id": record.snapshot_id,
             },
         )
         assert loaded.status_code == 200

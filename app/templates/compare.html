@@ -4,23 +4,14 @@
 {% block content %}
 <section class="box-page">
   <header class="page-heading">
-    <p class="page-eyebrow">Scheduler workspace</p>
-    <h1>Compare schedulers</h1>
-    <p class="box-lead">Compare two environments to find differences in jobs, statuses and parameters.</p>
+    <p class="page-eyebrow">Snapshot workspace</p>
+    <h1>Compare snapshots</h1>
+    <p class="box-lead">Compare two frozen snapshots without contacting either scheduler.</p>
   </header>
   <div id="compare-context-panel" class="box">
     <div class="box__section box__pad">
       <h2>Comparison context</h2>
-      <p class="muted box-lead">Scheduler type per environment is set in <a href="/settings">Settings</a>.</p>
-      <div class="snapshot-status">
-        {% if current_snapshot_manifest %}
-        <p class="small"><strong>Current snapshot:</strong> {{ current_snapshot_manifest.captured_at }} · {{ current_snapshot_manifest.left.environment_id }} ({{ current_snapshot_manifest.left.job_count }} jobs) → {{ current_snapshot_manifest.right.environment_id }} ({{ current_snapshot_manifest.right.job_count }} jobs)</p>
-        <p class="muted small">Matching parameters reuse this snapshot without fetching. Changed parameters capture a new snapshot. Refresh forces both sources to be fetched again.</p>
-        {% else %}
-        <p class="small"><strong>Current snapshot:</strong> none</p>
-        <p class="muted small">The first comparison captures both sources and stores one current snapshot for subsequent analysis.</p>
-        {% endif %}
-      </div>
+      <p class="muted box-lead">Choose an environment and one snapshot generated from the <a href="/snapshots">Snapshots</a> tab for each side.</p>
     </div>
     <div class="box__section box__pad">
       <form id="compare-form"
@@ -40,14 +31,14 @@
                         hx-get="/api/compare/side-form?side=left"
                         hx-trigger="change"
                         hx-target="#compare-left-context-fields"
-                        hx-include="[name='left_env'], [name='left_as_of'], [name='left_topology']">
+                        hx-include="[name='left_env']">
                   {% for env in environments %}
                   <option value="{{ env.id }}" {% if env.id == left_env %}selected{% endif %}>{{ env.display_name }}</option>
                   {% endfor %}
                 </select>
               </label>
               <div id="compare-left-context-fields">
-                {% with side='left', scheduler=left.scheduler, scheduler_label=left.scheduler_label, as_of=left.as_of, topology=left.topology, topologies=left.topologies %}
+                {% with side='left', snapshots=left.snapshots, selected_snapshot_id=left.selected_snapshot_id %}
                 {% include "partials/compare_side_fields.html" %}
                 {% endwith %}
               </div>
@@ -64,14 +55,14 @@
                         hx-get="/api/compare/side-form?side=right"
                         hx-trigger="change"
                         hx-target="#compare-right-context-fields"
-                        hx-include="[name='right_env'], [name='right_as_of'], [name='right_topology']">
+                        hx-include="[name='right_env']">
                   {% for env in environments %}
                   <option value="{{ env.id }}" {% if env.id == right_env %}selected{% endif %}>{{ env.display_name }}</option>
                   {% endfor %}
                 </select>
               </label>
               <div id="compare-right-context-fields">
-                {% with side='right', scheduler=right.scheduler, scheduler_label=right.scheduler_label, as_of=right.as_of, topology=right.topology, topologies=right.topologies %}
+                {% with side='right', snapshots=right.snapshots, selected_snapshot_id=right.selected_snapshot_id %}
                 {% include "partials/compare_side_fields.html" %}
                 {% endwith %}
               </div>
@@ -79,9 +70,8 @@
           </div>
         </div>
         <div class="box-form-actions">
-          <button type="submit">Compare snapshot</button>
-          <button type="submit" name="refresh" value="true" class="outline">Refresh &amp; compare</button>
-          <span id="compare-spinner" class="htmx-indicator" aria-live="polite">Fetching / analyzing…</span>
+          <button type="submit">Compare snapshots</button>
+          <span id="compare-spinner" class="htmx-indicator" aria-live="polite">Loading snapshots / analyzing…</span>
         </div>
       </form>
     </div>
@@ -92,7 +82,7 @@
     <div class="empty-state">
       <span class="empty-state-icon" aria-hidden="true">{{ compare_icon() }}</span>
       <h2>Ready to find the differences</h2>
-      <p class="box-output-placeholder">Select the left and right contexts, then click Compare.</p>
+      <p class="box-output-placeholder">Select the left and right snapshots, then click Compare snapshots.</p>
     </div>
   </div>
 </section>

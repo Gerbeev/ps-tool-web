@@ -1,24 +1,16 @@
-<input type="hidden" name="scheduler" id="browse-scheduler" value="{{ scheduler }}">
-<input type="hidden" name="as_of" id="browse-as-of" value="{{ as_of }}">
-{% if scheduler == 'process_scheduler' %}
 <label class="box-field-stack">
-  <span class="box-field-label">Topology</span>
-  <select name="topology" id="browse-topology" class="app-control">
-    {% for t in topologies %}
-    <option value="{{ t }}" {% if t == topology %}selected{% endif %}>{{ t }}</option>
+  <span class="box-field-label">Snapshot</span>
+  <select name="snapshot_id" id="browse-snapshot" class="app-control" {% if not snapshots %}disabled{% endif %}>
+    {% for item in snapshots %}
+    <option value="{{ item.snapshot_id }}" {% if item.snapshot_id == selected_snapshot_id %}selected{% endif %}>{{ item.label }}</option>
     {% endfor %}
-    {% if not topologies %}
-    <option value="">(no topologies)</option>
+    {% if not snapshots %}
+    <option value="">(no generated snapshots)</option>
     {% endif %}
   </select>
 </label>
-<p class="small muted box-note">Process Scheduler environments may expose multiple topologies.</p>
+{% if snapshots %}
+<p class="small muted box-note">Newest snapshot is selected by default. No source-system call is made here.</p>
 {% else %}
-<label class="box-field-stack">
-  <span class="box-field-label">Business date</span>
-  <input type="date" name="as_of" id="browse-as-of-visible" class="app-control" value="{{ as_of }}"
-         onchange="document.getElementById('browse-as-of').value = this.value">
-</label>
-<p class="small muted box-note">AutoSys jobs are scoped to the selected business date.</p>
-<input type="hidden" name="topology" id="browse-topology" value="">
+<p class="small muted box-note">No snapshot exists for this environment. Generate one in <a href="/snapshots">Snapshots</a>.</p>
 {% endif %}

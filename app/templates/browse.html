@@ -1,14 +1,14 @@
 {% extends "base.html" %}
 {% set active_nav = 'browse' %}
-{% block title %}Select environment — ps-tool-web{% endblock %}
+{% block title %}Browse — ps-tool-web{% endblock %}
 {% block content %}
 <section class="box-page">
   <header class="page-heading">
-    <p class="page-eyebrow">Scheduler workspace</p>
-    <h1>Browse jobs</h1>
-    <p class="box-lead">Explore your topology, filter runs and inspect job details.</p>
+    <p class="page-eyebrow">Snapshot workspace</p>
+    <h1>Browse topology</h1>
+    <p class="box-lead">Explore one previously generated snapshot. Browse never reads AutoSys or Process Scheduler directly.</p>
   </header>
-  <div id="browse-env-panel" class="browse-env-panel box">
+  <div id="browse-env-panel" class="box browse-env-panel">
     <div class="browse-env-panel-header box__section box__pad">
       <button type="button"
               id="browse-env-toggle"
@@ -19,11 +19,11 @@
         <span class="browse-env-chevron" aria-hidden="true"></span>
       </button>
       <div class="browse-env-panel-heading">
-        <h2>Select environment</h2>
+        <h2>Select snapshot</h2>
         <p id="browse-env-summary" class="browse-env-summary muted"></p>
       </div>
       <div class="browse-env-panel-actions">
-        <button type="submit" form="browse-form">Load tree</button>
+        <button type="submit" form="browse-form">Load snapshot</button>
         <span id="browse-spinner-header" class="htmx-indicator" aria-live="polite">Loading…</span>
       </div>
     </div>
@@ -40,7 +40,7 @@
                   hx-get="/api/browse/form"
                   hx-trigger="change"
                   hx-target="#browse-context-fields"
-                  hx-include="#browse-env, #browse-as-of, #browse-topology">
+                  hx-include="#browse-env">
             {% for env in environments %}
             <option value="{{ env.id }}" {% if env.id == environment_id %}selected{% endif %}>{{ env.display_name }}</option>
             {% endfor %}
@@ -57,8 +57,8 @@
     {% from 'macros/lucide_icons.html' import browse_icon %}
     <div class="empty-state">
       <span class="empty-state-icon" aria-hidden="true">{{ browse_icon() }}</span>
-      <h2>Your topology starts here</h2>
-      <p class="box-output-placeholder">Select an environment and click Load tree to explore its jobs.</p>
+      <h2>Your snapshot starts here</h2>
+      <p class="box-output-placeholder">Select an environment and one generated snapshot, then click Load snapshot.</p>
     </div>
   </div>
 </section>

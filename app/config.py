@@ -116,7 +116,7 @@ class AppSettings(BaseModel):
     data_dir: Path = Field(default_factory=lambda: _repo_root() / "data")
     snapshot_cache_ttl_sec: int = 180
     search_db_path: Path = Field(default_factory=lambda: _repo_root() / "data" / "search.db")
-    current_snapshot_dir: Path = Field(default_factory=lambda: _repo_root() / "data" / "runtime" / "current")
+    snapshot_dir: Path = Field(default_factory=lambda: _repo_root() / "data" / "runtime" / "snapshots")
     use_mock_adapters: bool = True
     allow_connection_config_edit: bool = True
     mock_job_count: int = 0
@@ -125,6 +125,10 @@ class AppSettings(BaseModel):
     mock_scenario: str = "u1_to_u5_migration"
     mock_scenario_path: Path = Field(default_factory=lambda: _repo_root() / "data" / "mock" / "u1_to_u5_migration_overlay.jsonl")
     table_page_size_default: int = 0  # 0 = show all rows on first load
+    connector_dir: Path = Field(default_factory=lambda: _repo_root() / "workstation_connectors")
+    connector_python: str = ""
+    connector_timeout_sec: int = 120
+    connector_max_response_mb: int = 128
 
 
 @lru_cache
@@ -138,8 +142,8 @@ def get_settings() -> AppSettings:
         data_dir=Path(os.getenv("PS_TOOL_DATA_DIR", str(root / "data"))),
         snapshot_cache_ttl_sec=int(os.getenv("SNAPSHOT_CACHE_TTL_SEC", "180")),
         search_db_path=Path(os.getenv("SEARCH_DB_PATH", str(root / "data" / "search.db"))),
-        current_snapshot_dir=Path(
-            os.getenv("CURRENT_SNAPSHOT_DIR", str(root / "data" / "runtime" / "current"))
+        snapshot_dir=Path(
+            os.getenv("SNAPSHOT_DIR", str(root / "data" / "runtime" / "snapshots"))
         ),
         use_mock_adapters=os.getenv("USE_MOCK_ADAPTERS", "true").lower() in ("1", "true", "yes"),
         allow_connection_config_edit=os.getenv("ALLOW_CONNECTION_CONFIG_EDIT", "true").lower()
@@ -160,6 +164,12 @@ def get_settings() -> AppSettings:
             )
         ),
         table_page_size_default=int(os.getenv("TABLE_PAGE_SIZE", "0")),
+        connector_dir=Path(
+            os.getenv("PS_TOOL_CONNECTOR_DIR", str(root / "workstation_connectors"))
+        ),
+        connector_python=os.getenv("PS_TOOL_CONNECTOR_PYTHON", "").strip(),
+        connector_timeout_sec=max(1, int(os.getenv("PS_TOOL_CONNECTOR_TIMEOUT_SEC", "120"))),
+        connector_max_response_mb=max(1, int(os.getenv("PS_TOOL_CONNECTOR_MAX_RESPONSE_MB", "128"))),
     )
 
 

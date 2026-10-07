@@ -2,7 +2,7 @@
 
 ## Purpose
 
-`data/mock/reference_topology_2500.jsonl` is the single healthy canonical source for deterministic mock scheduler data used before real endpoint adapters are available.
+`data/mock/reference_topology_2500.jsonl` is the single healthy canonical source for deterministic mock scheduler data used before workstation bridge connectors are available.
 
 The file is environment-neutral. It does not contain concrete UAT/PROD tokens in individual job records. A snapshot is materialized for a selected environment by inserting that environment token into the native scheduler job name.
 

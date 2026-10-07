@@ -28,35 +28,15 @@
       return;
     }
     var env = selectedLabel('browse-env');
-    var schedVal = document.getElementById('browse-scheduler');
-    var schedType = schedVal ? schedVal.value : '';
-    var sched =
-      schedType === 'process_scheduler'
-        ? 'Process Scheduler'
-        : schedType === 'autosys'
-          ? 'AutoSys'
-          : '';
+    var snapshot = selectedLabel('browse-snapshot');
     var parts = [];
     if (env) {
       parts.push(env);
     }
-    if (sched) {
-      parts.push(sched);
+    if (snapshot && snapshot !== '(no generated snapshots)') {
+      parts.push(snapshot);
     }
-    if (schedType === 'process_scheduler') {
-      var topo = document.getElementById('browse-topology');
-      if (topo && topo.value) {
-        parts.push(topo.value);
-      }
-    } else {
-      var asOfHidden = document.getElementById('browse-as-of');
-      var asOfVisible = document.getElementById('browse-as-of-visible');
-      var asOf = (asOfVisible && asOfVisible.value) || (asOfHidden && asOfHidden.value);
-      if (asOf) {
-        parts.push(asOf);
-      }
-    }
-    summary.textContent = parts.length ? parts.join(' · ') : 'Select context and load tree';
+    summary.textContent = parts.length ? parts.join(' · ') : 'Select a generated snapshot';
   }
 
   function setCollapsed(collapsed) {
@@ -69,7 +49,7 @@
     btn.setAttribute('aria-expanded', collapsed ? 'false' : 'true');
     btn.setAttribute(
       'aria-label',
-      collapsed ? 'Expand browse environment panel' : 'Collapse browse environment panel'
+      collapsed ? 'Expand browse snapshot panel' : 'Collapse browse snapshot panel'
     );
     try {
       localStorage.setItem(STORAGE_KEY, collapsed ? 'collapsed' : 'expanded');

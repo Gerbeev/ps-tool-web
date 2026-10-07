@@ -1,4 +1,4 @@
-"""Single-environment browse page and HTMX fragments."""
+"""Browse immutable generated snapshots only; never access scheduler sources."""
 
 from __future__ import annotations
 
@@ -12,17 +12,10 @@ from app.browse_status_filters import (
     BROWSE_STATUS_LABELS,
 )
 from app.config import load_environments
-from app.context_helpers import (
-    default_business_date,
-    environment_scheduler_value,
-    parse_browse_context,
-    scheduler_label,
-    topology_options,
-)
 from app.models import SchedulerType
 from app.search.sqlite_fts import search_index
-from app.services.comparison import fetch_snapshot, job_status_css
-from app.services.current_snapshot import current_snapshot_store
+from app.services.comparison import job_status_css
+from app.services.snapshot_catalog import SnapshotRecord, snapshot_catalog
 from app.services.topology_index import child_count, get_child_nodes, get_job, lazy_roots
 from app.session_store import BrowseSession, session_store
 
@@ -39,24 +32,23 @@ def _env_options():
     return load_environments()
 
 
+def _snapshot_options(environment_id: str) -> list[SnapshotRecord]:
+    return snapshot_catalog.list(environment_id=environment_id)
+
+
 @router.get("/browse", response_class=HTMLResponse)
 async def browse_page(request: Request):
     envs = _env_options()
-    default_env = envs[0].id if envs else "uat-rd"
-    scheduler = environment_scheduler_value(default_env)
-    as_of = default_business_date()
-    topologies = topology_options(default_env, scheduler)
+    default_env = envs[0].id if envs else ""
+    snapshots = _snapshot_options(default_env) if default_env else []
     return templates.TemplateResponse(
         request,
         "browse.html",
         {
             "environments": envs,
             "environment_id": default_env,
-            "scheduler": scheduler,
-            "scheduler_label": scheduler_label(scheduler),
-            "as_of": as_of,
-            "topology": topologies[0] if topologies else "",
-            "topologies": topologies,
+            "snapshots": snapshots,
+            "selected_snapshot_id": snapshots[0].snapshot_id if snapshots else "",
             "session_id": None,
             "snapshot": None,
         },
@@ -66,26 +58,15 @@ async def browse_page(request: Request):
 @router.get("/api/browse/form", response_class=HTMLResponse)
 async def browse_form_partial(
     request: Request,
-    environment_id: str = "uat-rd",
-    scheduler: str = "",
-    as_of: str = "",
-    topology: str = "",
+    environment_id: str = "",
 ):
-    if not scheduler:
-        scheduler = environment_scheduler_value(environment_id)
-    if not as_of:
-        as_of = default_business_date()
-    topologies = topology_options(environment_id, scheduler)
-    if not topology and topologies:
-        topology = topologies[0]
+    snapshots = _snapshot_options(environment_id) if environment_id else []
     return templates.TemplateResponse(
         request,
         "partials/browse_form_fields.html",
         {
-            "scheduler": scheduler,
-            "as_of": as_of,
-            "topology": topology,
-            "topologies": topologies,
+            "snapshots": snapshots,
+            "selected_snapshot_id": snapshots[0].snapshot_id if snapshots else "",
         },
     )
 
@@ -94,39 +75,41 @@ async def browse_form_partial(
 async def browse_load(
     request: Request,
     environment_id: str = Form(...),
-    scheduler: str = Form(""),
-    as_of: str = Form(""),
-    topology: str = Form(""),
+    snapshot_id: str = Form(""),
 ):
-    if not scheduler:
-        scheduler = environment_scheduler_value(environment_id)
-    if not as_of:
-        as_of = default_business_date()
-    context = parse_browse_context(environment_id, scheduler, as_of, topology)
-    current = current_snapshot_store.load_for_context(context)
-    if current is not None:
-        snapshot, snapshot_manifest, snapshot_side = current
-        snapshot_origin = "current"
-    else:
-        snapshot, _ = fetch_snapshot(context)
-        snapshot_manifest = None
-        snapshot_side = None
-        snapshot_origin = "live"
+    if not snapshot_id:
+        return HTMLResponse(
+            '<div class="box__section box__pad"><p><strong>No snapshot selected.</strong></p>'
+            '<p class="muted small">Generate or select a snapshot first.</p></div>'
+        )
+    loaded = snapshot_catalog.load(snapshot_id)
+    if loaded is None:
+        return HTMLResponse(
+            '<div class="box__section box__pad"><p><strong>Snapshot not found or corrupted.</strong></p>'
+            '<p class="muted small">Generate a new snapshot from the Snapshots tab.</p></div>'
+        )
+    snapshot, record = loaded
+    if record.environment_id != environment_id:
+        return HTMLResponse(
+            '<div class="box__section box__pad"><p><strong>Snapshot/environment mismatch.</strong></p></div>',
+            status_code=400,
+        )
+
     search_index.rebuild(snapshot, "left")
     sid = session_store.new_id()
-    session_store.put_browse(BrowseSession(session_id=sid, context=context, snapshot=snapshot))
+    session_store.put_browse(
+        BrowseSession(session_id=sid, context=snapshot.context, snapshot=snapshot)
+    )
     meta = snapshot.metadata or {}
     return templates.TemplateResponse(
         request,
         "partials/browse_results.html",
         {
             "snapshot": snapshot,
+            "snapshot_record": record,
             "session_id": sid,
-            "context": context,
-            "meta_line": _meta_line(context, meta),
-            "snapshot_origin": snapshot_origin,
-            "snapshot_manifest": snapshot_manifest,
-            "snapshot_side": snapshot_side,
+            "context": snapshot.context,
+            "meta_line": _meta_line(snapshot.context, meta),
         },
     )
 
@@ -143,7 +126,7 @@ def _meta_line(context, meta: dict) -> str:
 async def browse_job_detail(request: Request, uid: str, session_id: str):
     session = session_store.get_browse(session_id)
     if not session:
-        return HTMLResponse("<p>Session expired. Load the environment again.</p>", status_code=404)
+        return HTMLResponse("<p>Session expired. Load the snapshot again.</p>", status_code=404)
     job = get_job(session.snapshot, uid)
     if not job:
         return HTMLResponse("<p>Job not found.</p>", status_code=404)
@@ -158,12 +141,9 @@ async def browse_job_detail(request: Request, uid: str, session_id: str):
 async def browse_tree(request: Request, session_id: str, parent_uid: str = "", depth: int = 0):
     session = session_store.get_browse(session_id)
     if not session:
-        return HTMLResponse("<p>Session expired. Load the environment again.</p>", status_code=404)
+        return HTMLResponse("<p>Session expired. Load the snapshot again.</p>", status_code=404)
     snap = session.snapshot
-    if not parent_uid:
-        nodes = lazy_roots(snap)
-    else:
-        nodes = get_child_nodes(snap, parent_uid)
+    nodes = lazy_roots(snap) if not parent_uid else get_child_nodes(snap, parent_uid)
     return templates.TemplateResponse(
         request,
         "partials/tree_browse_nodes.html",

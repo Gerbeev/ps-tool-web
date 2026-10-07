@@ -2,11 +2,7 @@
 <header class="box__section box__pad box-section-head">
   <div>
     <p class="browse-meta"><strong>{{ meta_line }}</strong> · {{ snapshot.flat_jobs|length }} jobs</p>
-    {% if snapshot_origin == 'current' and snapshot_manifest %}
-    <p class="muted small">Using current comparison snapshot · {{ snapshot_side }} side · captured {{ snapshot_manifest.captured_at }}. No scheduler fetch was performed.</p>
-    {% else %}
-    <p class="muted small">Loaded for Browse only. This does not replace the current comparison snapshot.</p>
-    {% endif %}
+    <p class="muted small">Snapshot {{ snapshot_record.snapshot_id }} · captured {{ snapshot_record.captured_at }}. Loaded from the local snapshot catalog. No scheduler fetch was performed.</p>
   </div>
 </header>
 <div id="browse-workspace" class="browse-workspace box__section">

@@ -17,8 +17,8 @@ from app.models import (
 class SchedulerAdapter(ABC):
     """Boundary between scheduler-specific retrieval and the comparison engine.
 
-    Real adapters should normalize native data into ``TopologySnapshot`` and declare
-    any fields they cannot provide instead of fabricating empty values.
+    Mock adapters return engine snapshots directly. Real bank connectivity is isolated
+    behind ``ExternalBridgeAdapter`` and scheduler-bridge/v1.
     """
 
     scheduler_type: SchedulerType
@@ -58,30 +58,3 @@ def complete_parameter_support(
     support = {parameter: default for parameter in parameters}
     support.update(overrides or {})
     return support
-
-class EndpointSchedulerAdapter(SchedulerAdapter):
-    """Base class for bank adapters backed by a configured HTTP(S) endpoint.
-
-    It intentionally does not prescribe authentication, DTO shape, pagination, or the
-    HTTP client. Those remain bank-specific. The only shared responsibility here is
-    validating and exposing the configured service boundary.
-    """
-
-    def __init__(self, environment) -> None:
-        from urllib.parse import urlsplit
-
-        endpoint_url = (environment.endpoint_url or "").strip().rstrip("/")
-        if not endpoint_url:
-            raise ValueError(f"endpoint_url is required for environment {environment.id!r}")
-        parsed = urlsplit(endpoint_url)
-        if parsed.scheme not in {"http", "https"} or not parsed.netloc:
-            raise ValueError(
-                f"endpoint_url must be an absolute http(s) URL for environment {environment.id!r}"
-            )
-        if parsed.username or parsed.password:
-            raise ValueError("endpoint_url must not contain embedded credentials")
-        if parsed.query or parsed.fragment:
-            raise ValueError("endpoint_url must be a base URL without query or fragment")
-
-        self.environment = environment
-        self.endpoint_url = endpoint_url

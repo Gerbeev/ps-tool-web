@@ -33,7 +33,19 @@ def test_process_scheduler_catalog_matches_reference_capture():
     assert u5.display_name == "U5 (UAT)"
 
 
-def test_compare_side_form_loads_topology_for_ps():
+def test_snapshots_source_form_loads_topology_for_ps():
+    from fastapi.testclient import TestClient
+
+    from app.main import app
+
+    client = TestClient(app)
+    resp = client.get("/api/snapshots/source-form?environment_id=ps-u5")
+    assert resp.status_code == 200
+    assert 'name="topology_id"' in resp.text
+    assert "risk_daily_topology" in resp.text
+
+
+def test_compare_side_form_uses_snapshot_selector_for_ps():
     from fastapi.testclient import TestClient
 
     from app.main import app
@@ -41,9 +53,8 @@ def test_compare_side_form_loads_topology_for_ps():
     client = TestClient(app)
     resp = client.get("/api/compare/side-form?side=right&right_env=ps-u5")
     assert resp.status_code == 200
-    assert 'name="right_topology"' in resp.text
-    assert "option" in resp.text
-    assert "Process Scheduler" in resp.text
+    assert 'name="right_snapshot_id"' in resp.text
+    assert 'right_topology' not in resp.text
 
 
 def test_host_for_environment_from_scheduler_specific_yaml():
@@ -67,17 +78,21 @@ def test_autosys_reference_environment_is_separate():
     assert resolve_scheduler(envs[0]) == SchedulerType.AUTOSYS
 
 
-def test_compare_side_form_shows_business_date_for_autosys():
+def test_autosys_date_is_owned_by_snapshots_generation_not_compare():
     from fastapi.testclient import TestClient
 
     from app.main import app
 
     client = TestClient(app)
-    resp = client.get("/api/compare/side-form?side=left&left_env=autosys-u1")
-    assert resp.status_code == 200
-    assert 'name="left_as_of"' in resp.text
-    assert 'type="date"' in resp.text
-    assert "AutoSys" in resp.text
+    source = client.get("/api/snapshots/source-form?environment_id=autosys-u1")
+    assert source.status_code == 200
+    assert "AutoSys capture" in source.text
+    assert 'type="date"' not in source.text
+
+    compare = client.get("/api/compare/side-form?side=left&left_env=autosys-u1")
+    assert compare.status_code == 200
+    assert 'name="left_snapshot_id"' in compare.text
+    assert 'left_as_of' not in compare.text
 
 
 def test_environment_entry_accepts_legacy_host_key():

@@ -4,22 +4,12 @@ from __future__ import annotations
 
 from datetime import date
 
-from app.adapters.factory import get_adapter
 from app.config import endpoint_for_environment, scheduler_for_environment
 from app.models import ComparisonContext, ContextFilters, SchedulerType
 
 
 def default_business_date() -> str:
     return date.today().isoformat()
-
-
-def topology_options(environment_id: str, scheduler: str | SchedulerType) -> list[str]:
-    sched = scheduler if isinstance(scheduler, SchedulerType) else SchedulerType(scheduler)
-    if sched != SchedulerType.PROCESS_SCHEDULER:
-        return []
-    adapter = get_adapter(SchedulerType.PROCESS_SCHEDULER, environment_id)
-    ctx = ComparisonContext(environment_id=environment_id, scheduler=SchedulerType.PROCESS_SCHEDULER)
-    return adapter.list_roots(ctx)
 
 
 def scheduler_label(scheduler: str) -> str:

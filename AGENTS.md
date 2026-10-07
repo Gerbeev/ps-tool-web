@@ -1,95 +1,107 @@
-# Agent Instructions: Bank-Side Endpoint Adapter Integration
+# Agent Instructions: Scheduler Snapshot + Workstation Bridge Architecture
 
-## Objective
+## Non-negotiable boundary
 
-Connect this existing comparison engine to the bank-internal AutoSys and Process Scheduler HTTP/API endpoints. Do not redesign the comparison engine unless a reproducible contract test demonstrates that the normalized model cannot represent a required source semantic.
+The portable web project must remain independent from bank-local AutoSys and Process Scheduler implementation code.
 
-Both schedulers are integration boundaries exposed through endpoints:
+Real connectivity is out-of-process only:
 
-- AutoSys adapter -> AutoSys integration endpoint;
-- Process Scheduler adapter -> Process Scheduler endpoint.
+```text
+Snapshots UI
+  -> app.services.snapshot_generation
+  -> SchedulerAdapter
+  -> ExternalBridgeAdapter
+  -> scheduler-bridge/v1 (stdin/stdout JSON)
+  -> workstation_connectors/autosys_connector.py
+     or workstation_connectors/process_scheduler_connector.py
+  -> existing bank-local Python tool/API
+```
 
-Process Scheduler may internally read topology/runtime data from Cosmos DB or other storage. That implementation detail is **outside this tool's boundary**. Do not connect this application directly to Cosmos DB and do not parse Process Scheduler persistence formats unless the endpoint contract explicitly returns such data and there is no structured alternative.
+Never add `bank_autosys*.py`, `bank_process_scheduler*.py`, dynamic adapter imports, direct Cosmos access, or bank-only imports under `app/`.
 
-## Allowed Integration Surface
+## Snapshot architecture
 
-Prefer changes only in:
+`Snapshots` is the only web workflow allowed to access scheduler sources.
 
-- new `app/adapters/bank_autosys*.py` modules;
-- new `app/adapters/bank_process_scheduler*.py` modules;
-- `app/adapters/site.py` for explicit adapter registration;
-- `config/environments.yaml` for endpoint/profile selection;
-- `config/identity_map.yaml` for verified name mappings;
-- tests/fixtures containing sanitized or synthetic endpoint payloads.
+- AutoSys: choose environment, capture the current business date.
+- Process Scheduler: choose environment, call `list_roots` through the bridge, select an existing topology, then capture it.
+- Every successful capture becomes a new immutable catalog entry with its own `snapshot_id`.
+- Runtime snapshot files live under `SNAPSHOT_DIR` and are git-ignored.
 
-Do not put source-specific conditions into `app/services/comparison.py`.
+Browse, Compare, Search, and Export are snapshot consumers only. They must not import or call:
 
-## Required Workflow
+```text
+get_adapter
+fetch_snapshot
+ExternalBridgeAdapter
+list_roots
+```
 
-1. Inspect the real endpoint contracts, DTOs/OpenAPI definitions, and representative sanitized responses inside the bank before coding mappings.
-2. Identify stable job IDs, topology/container relations, explicit execution dependencies, schedules, commands, runtime states, timing, logs and equivalent migration fields from the endpoint response models.
-3. Implement one `SchedulerAdapter` per endpoint.
-4. Use `TopologySnapshotBuilder`; never infer execution dependencies from UI/tree containment.
-5. Enable `strict_parameter_support=True` for real adapters and explicitly declare every comparison field with `complete_parameter_support()`.
-6. Mark unavailable mappings as `UNSUPPORTED` or `UNKNOWN`; never fabricate empty values to make the contract pass.
-7. Mark type-specific irrelevant fields `NOT_APPLICABLE` at job level.
-8. Add `comparison_evidence` for non-obvious mappings so mismatches are traceable to endpoint response fields/DTO paths.
-9. Register adapters explicitly in `app/adapters/site.py`. Do not implement configuration-controlled arbitrary Python imports.
-10. Run adapter contract checks and the full test suite.
+Browse selects `environment + snapshot_id`. Compare selects `environment + snapshot_id` independently for both sides. Neither view owns business-date/topology source controls and neither view refreshes data.
 
-## Endpoint Rules
+## Frozen workstation contract
 
-- Treat each endpoint response as the adapter's source of truth.
-- Topology/container membership -> `parent_uid` only.
-- Explicit dependency/trigger relation -> `DependencyEdge`.
-- Native status -> normalized `JobStatus` plus unchanged `status_raw`.
-- Native fields semantically equivalent to AutoSys -> `autosys.jil` / `autosys.run` projection.
-- Native fields with no safe AutoSys equivalent -> preserve in `attributes` and mark the corresponding comparison field unsupported/not-applicable.
-- Do not force every Process Scheduler concept into JIL.
-- Do not reconstruct missing dependencies from ordering, nesting, display position, or naming conventions.
-- Do not query Process Scheduler's Cosmos DB directly from this tool; the Process Scheduler endpoint owns its storage model.
+`scheduler-bridge/v1` is the stable handoff. Existing v1 field meanings and operation semantics must not be changed incompatibly. If an incompatible change is unavoidable, introduce `scheduler-bridge/v2` rather than silently changing v1.
 
-## AutoSys Rules
+The workstation connector files must not import:
 
-- Preserve static definition separately from runtime state.
-- Box membership is containment, not an execution dependency by itself.
-- Build dependency edges from real conditions/dependency semantics exposed by the AutoSys endpoint.
-- Preserve unknown JIL/native attributes returned by the endpoint; do not silently drop source fields.
-- Reuse the existing semantic normalization and validation logic instead of raw string comparison.
+```text
+app.models
+app.adapters
+app.services
+```
 
-## Identity Rules
+Only the portable translator in `app/adapters/bridge_contract.py` maps the frozen wire DTO into current internal models.
 
-The engine assigns logical identity after retrieval. Prefer verified `identity_map.yaml` mappings where names differ. For cross-environment matching, follow `config/job_naming_rules.yaml`: parse the fixed shared prefix, four-digit business code, environment token, and job-specific remainder; retain business code + job-specific name in the canonical identity and exclude the environment token. Do not hardcode concrete business/environment values into the naming rule. Do not resolve duplicate logical IDs by choosing the first result. Identity conflicts must remain visible until resolved.
+## Workstation implementation surface
 
-## Required Validation Commands
+On the bank workstation, source-specific code belongs only in the persistent local connector directory configured by `PS_TOOL_CONNECTOR_DIR`:
+
+```text
+bridge_v1_runtime.py              # keep unchanged
+autosys_connector.py              # bank-local AutoSys mapping
+process_scheduler_connector.py    # bank-local PS mapping
+```
+
+The two provider scripts may call the existing internal Python tool/connectors, authenticate using approved local mechanisms, paginate/retry bounded idempotent reads, and map source DTOs into bridge-v1 dictionaries.
+
+They must not implement comparison logic, identity matching, UI behavior, or snapshot persistence.
+
+## Mapping rules
+
+- Stable source ID -> `job_uid`.
+- Scheduler display name -> `scheduler_job_name`.
+- Container/box/topology membership -> `parent_uid`.
+- Native status -> normalized `status` plus unchanged `status_raw`.
+- Explicit execution predecessor/trigger -> `dependencies[]`.
+- Verified AutoSys/JIL equivalent -> `autosys_jil`.
+- Verified runtime equivalent -> `autosys_run`.
+- Process Scheduler native detail -> `process_scheduler`.
+- Non-comparison source fields -> `attributes`.
+
+Containment is not execution dependency. Never infer dependency edges from tree position, ordering, or naming.
+
+## Failure semantics
+
+A connector must return `ok=false` instead of an empty/partial snapshot when retrieval is incomplete, including authentication failure, timeout, incompatible schema, parse failure, or incomplete pagination.
+
+The Snapshots workflow validates the normalized snapshot before catalog publication. Failed generation must leave all existing snapshots untouched.
+
+## Security and data handling
+
+- No credentials/tokens/certificates in the repository, environment YAML, bridge payloads, or logs.
+- Do not log raw source DTOs or sensitive command output.
+- Runtime snapshots are bank-sensitive and remain under git-ignored `data/runtime/` (or configured `SNAPSHOT_DIR`).
+- Workstation connector implementations remain local and are not committed.
+- The bridge launcher must keep `shell=False`, bounded timeout, response-size limits, protocol/version checks, and request-ID validation.
+
+## Required validation
 
 ```bash
 python -m app.adapters.check --environment <autosys-env> --scheduler autosys --as-of <YYYY-MM-DD>
 python -m app.adapters.check --environment <ps-env> --scheduler process_scheduler --as-of <YYYY-MM-DD>
+python -m scripts.verify_checkout --runtime
 python -m pytest -q
 ```
 
-All adapter contract checks must exit `0`. The full suite must pass.
-
-## Data and Security Constraints
-
-- Do not copy bank endpoint payloads, job definitions, commands, credentials, hostnames, log content or production data outside the bank environment.
-- Do not commit secrets or access tokens. Use approved environment/secret management and the bank's required authentication mechanism.
-- Do not log raw endpoint payloads by default.
-- Do not put credentials or sensitive data into query parameters when headers/body are supported by the endpoint contract.
-- Keep field evidence minimal and structural; never include secrets or sensitive runtime output.
-- Any fixtures committed to the repository must be synthetic or sanitized.
-- Apply explicit connect/read timeouts and bounded retries in endpoint adapters; do not retry non-idempotent operations. These adapters should normally be read-only.
-
-## Definition of Done
-
-The integration is complete only when:
-
-- both real endpoint adapters pass contract checks;
-- strict field coverage has no undeclared parameters;
-- containment and dependency semantics have been separately verified against the endpoint DTOs;
-- identity conflicts are resolved or explicitly accepted as unresolved;
-- unsupported fields appear as `not comparable`, not mismatches;
-- known controlled differences produce expected comparison results;
-- endpoint failures surface as structured adapter errors rather than partial/empty snapshots;
-- no regression is introduced into the engine test suite.
+The test suite includes a source-isolation regression guard. Do not remove or weaken it: Browse, Compare, and Export must continue to function after generated snapshots exist even when adapter access is made to fail deliberately.

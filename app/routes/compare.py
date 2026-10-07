@@ -1,4 +1,4 @@
-"""Compare page and HTMX fragments."""
+"""Compare immutable generated snapshots only; never access scheduler sources."""
 
 from __future__ import annotations
 
@@ -7,17 +7,9 @@ from fastapi.responses import HTMLResponse
 from fastapi.templating import Jinja2Templates
 
 from app.config import get_settings, load_environments
-from app.context_helpers import (
-    default_business_date,
-    environment_scheduler_value,
-    parse_compare_side_context,
-    scheduler_label,
-    topology_options,
-)
 from app.search.sqlite_fts import search_index
 from app.services.comparison import compare_snapshots, job_status_css
-from app.services.current_snapshot import current_snapshot_store
-from app.services.current_snapshot_flow import SnapshotCaptureError, get_or_capture_current_pair
+from app.services.snapshot_catalog import SnapshotRecord, snapshot_catalog
 from app.services.table_rows import (
     iter_table_rows,
     page_table_rows,
@@ -32,24 +24,20 @@ templates.env.globals["job_status_css"] = job_status_css
 templates.env.globals["tree_child_count"] = child_count
 
 
-def _side_form_context(environment_id: str, as_of: str = "", topology: str = ""):
-    scheduler = environment_scheduler_value(environment_id)
-    if not as_of:
-        as_of = default_business_date()
-    topologies = topology_options(environment_id, scheduler)
-    if not topology and topologies:
-        topology = topologies[0]
-    return {
-        "scheduler": scheduler,
-        "scheduler_label": scheduler_label(scheduler),
-        "as_of": as_of,
-        "topology": topology,
-        "topologies": topologies,
-    }
-
-
 def _env_options():
     return load_environments()
+
+
+def _snapshot_options(environment_id: str) -> list[SnapshotRecord]:
+    return snapshot_catalog.list(environment_id=environment_id)
+
+
+def _side_form_context(environment_id: str) -> dict:
+    snapshots = _snapshot_options(environment_id) if environment_id else []
+    return {
+        "snapshots": snapshots,
+        "selected_snapshot_id": snapshots[0].snapshot_id if snapshots else "",
+    }
 
 
 def _snapshot_for_side(session: CompareSession, side: str):
@@ -66,14 +54,12 @@ def _mismatch_logical_ids(result) -> set[str]:
         if pair.logical_id:
             ids.add(pair.logical_id)
     for job in result.left_only:
-        lid = job.logical_id or job.scheduler_job_name
-        ids.add(lid)
+        ids.add(job.logical_id or job.scheduler_job_name)
     for job in result.right_only:
-        lid = job.logical_id or job.scheduler_job_name
-        ids.add(lid)
-    for m in result.parameter_mismatches:
-        if m.logical_id:
-            ids.add(m.logical_id)
+        ids.add(job.logical_id or job.scheduler_job_name)
+    for mismatch in result.parameter_mismatches:
+        if mismatch.logical_id:
+            ids.add(mismatch.logical_id)
     for pair in result.execution_time_deltas:
         if pair.logical_id:
             ids.add(pair.logical_id)
@@ -83,11 +69,9 @@ def _mismatch_logical_ids(result) -> set[str]:
 @router.get("/compare", response_class=HTMLResponse)
 async def compare_page(request: Request):
     envs = _env_options()
-    default_env = envs[0].id if envs else "uat-rd"
+    default_env = envs[0].id if envs else ""
     left_env = default_env
     right_env = envs[1].id if len(envs) > 1 else default_env
-    left_ctx = _side_form_context(left_env)
-    right_ctx = _side_form_context(right_env)
     return templates.TemplateResponse(
         request,
         "compare.html",
@@ -95,11 +79,10 @@ async def compare_page(request: Request):
             "environments": envs,
             "left_env": left_env,
             "right_env": right_env,
-            "left": left_ctx,
-            "right": right_ctx,
+            "left": _side_form_context(left_env),
+            "right": _side_form_context(right_env),
             "result": None,
             "session_id": None,
-            "current_snapshot_manifest": current_snapshot_store.load_manifest(),
         },
     )
 
@@ -111,19 +94,12 @@ async def compare_side_form(
     environment_id: str = Query(""),
     left_env: str = Query(""),
     right_env: str = Query(""),
-    left_as_of: str = Query(""),
-    right_as_of: str = Query(""),
-    left_topology: str = Query(""),
-    right_topology: str = Query(""),
 ):
     env_id = environment_id or (left_env if side == "left" else right_env)
-    as_of = left_as_of if side == "left" else right_as_of
-    topology = left_topology if side == "left" else right_topology
-    ctx = _side_form_context(env_id, as_of=as_of, topology=topology)
     return templates.TemplateResponse(
         request,
         "partials/compare_side_fields.html",
-        {"side": side, **ctx},
+        {"side": side, **_side_form_context(env_id)},
     )
 
 
@@ -131,31 +107,31 @@ async def compare_side_form(
 async def run_compare(
     request: Request,
     left_env: str = Form(...),
-    left_scheduler: str = Form(""),
-    left_as_of: str = Form(""),
-    left_topology: str = Form(""),
+    left_snapshot_id: str = Form(""),
     right_env: str = Form(...),
-    right_scheduler: str = Form(""),
-    right_as_of: str = Form(""),
-    right_topology: str = Form(""),
-    refresh: bool = Form(False),
+    right_snapshot_id: str = Form(""),
 ):
-    if not left_scheduler:
-        left_scheduler = environment_scheduler_value(left_env)
-    if not right_scheduler:
-        right_scheduler = environment_scheduler_value(right_env)
-    left = parse_compare_side_context(left_env, left_scheduler, left_as_of, left_topology)
-    right = parse_compare_side_context(right_env, right_scheduler, right_as_of, right_topology)
-    try:
-        current_pair = get_or_capture_current_pair(left, right, refresh=refresh)
-    except SnapshotCaptureError as exc:
+    if not left_snapshot_id or not right_snapshot_id:
         return HTMLResponse(
-            f'<div class="box__section box__pad"><p><strong>Snapshot refresh failed.</strong> {exc}</p>'
-            '<p class="muted small">The previous current snapshot was kept unchanged.</p></div>',
-            status_code=502,
+            '<div class="box__section box__pad"><p><strong>Select a snapshot on both sides.</strong></p>'
+            '<p class="muted small">Generate missing snapshots from the Snapshots tab.</p></div>'
         )
-    left_snap = current_pair.left
-    right_snap = current_pair.right
+    left_loaded = snapshot_catalog.load(left_snapshot_id)
+    right_loaded = snapshot_catalog.load(right_snapshot_id)
+    if left_loaded is None or right_loaded is None:
+        return HTMLResponse(
+            '<div class="box__section box__pad"><p><strong>One or both snapshots are missing or corrupted.</strong></p>'
+            '<p class="muted small">Generate replacements from the Snapshots tab.</p></div>'
+        )
+
+    left_snap, left_record = left_loaded
+    right_snap, right_record = right_loaded
+    if left_record.environment_id != left_env or right_record.environment_id != right_env:
+        return HTMLResponse(
+            '<div class="box__section box__pad"><p><strong>Snapshot/environment mismatch.</strong></p></div>',
+            status_code=400,
+        )
+
     result = compare_snapshots(left_snap, right_snap)
     search_index.rebuild(left_snap, "left")
     search_index.rebuild(right_snap, "right")
@@ -163,8 +139,8 @@ async def run_compare(
     session_store.put(
         CompareSession(
             session_id=sid,
-            left=left,
-            right=right,
+            left=left_snap.context,
+            right=right_snap.context,
             left_snapshot=left_snap,
             right_snapshot=right_snap,
             result=result,
@@ -180,8 +156,8 @@ async def run_compare(
             "table_filter": "all",
             "table_limit": settings.table_page_size_default,
             "mismatch_ids": _mismatch_logical_ids(result),
-            "snapshot_manifest": current_pair.manifest,
-            "snapshot_origin": current_pair.origin,
+            "left_record": left_record,
+            "right_record": right_record,
         },
     )
 

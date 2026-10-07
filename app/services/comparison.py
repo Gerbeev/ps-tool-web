@@ -56,11 +56,14 @@ def fetch_snapshot(
     snap = None if force_refresh else c.get(key)
     if snap is None:
         snap = adapter.fetch_topology(context)
+        snap.capabilities = adapter.capabilities()
         should_cache = True
     else:
+        # Capabilities are part of the captured source contract. A fresh adapter
+        # instance may not have contacted an out-of-process connector yet, so
+        # overwriting a cached snapshot here would silently lose field support.
         should_cache = False
 
-    snap.capabilities = adapter.capabilities()
     snap.metadata["match_confidence_by_uid"] = annotate_snapshot_jobs(
         snap.flat_jobs, context.scheduler
     )

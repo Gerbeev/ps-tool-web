@@ -18,6 +18,7 @@ from app.models import (
 )
 from app.services.comparison import compare_contexts
 from app.services.table_rows import iter_table_rows, page_table_rows
+from app.services.snapshot_generation import generate_snapshot, list_process_scheduler_topologies
 from app.services.topology_index import (
     build_children_index,
     ensure_topology_indexes,
@@ -50,15 +51,16 @@ def test_table_page_default_returns_all_rows():
 
 
 def test_compare_table_endpoint_all_by_default():
+    left_record = generate_snapshot("autosys-u1").record
+    topology = list_process_scheduler_topologies("ps-u5")[0]
+    right_record = generate_snapshot("ps-u5", topology_id=topology).record
     resp = client.post(
         "/api/compare",
         data={
-            "left_env": "uat-rd",
-            "left_scheduler": "autosys",
-            "left_as_of": "2026-10-02",
-            "right_env": "test-rd",
-            "right_scheduler": "process_scheduler",
-            "right_topology": "RISK_ANALYTICS",
+            "left_env": left_record.environment_id,
+            "left_snapshot_id": left_record.snapshot_id,
+            "right_env": right_record.environment_id,
+            "right_snapshot_id": right_record.snapshot_id,
         },
     )
     assert resp.status_code == 200
@@ -157,15 +159,16 @@ def test_search_requires_session_id():
     assert empty.status_code == 200
     assert empty.json() == []
 
+    left_record = generate_snapshot("autosys-u1").record
+    topology = list_process_scheduler_topologies("ps-u5")[0]
+    right_record = generate_snapshot("ps-u5", topology_id=topology).record
     resp = client.post(
         "/api/compare",
         data={
-            "left_env": "uat-rd",
-            "left_scheduler": "autosys",
-            "left_as_of": "2026-10-02",
-            "right_env": "test-rd",
-            "right_scheduler": "process_scheduler",
-            "right_topology": "RISK_ANALYTICS",
+            "left_env": left_record.environment_id,
+            "left_snapshot_id": left_record.snapshot_id,
+            "right_env": right_record.environment_id,
+            "right_snapshot_id": right_record.snapshot_id,
         },
     )
     import re

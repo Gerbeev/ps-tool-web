@@ -7,7 +7,7 @@
 
 ## Canonical 2,500-job mock dataset
 
-Until real scheduler endpoint adapters are wired, local mock mode uses one healthy environment-neutral reference file: `data/mock/reference_topology_2500.jsonl`. It contains exactly 2,500 hierarchical jobs across 25 synthetic four-digit business groups. AutoSys U1 is the default healthy reference projection. Process Scheduler U5 is materialized from the same source and receives a deterministic migration-problem overlay from `data/mock/u1_to_u5_migration_overlay.jsonl` (missing, failed, long-running, activated/waiting, on-ice/cancelled, slow-success execution-time regressions, timing and selected definition/dependency drift). Only AutoSys U1 and Process Scheduler U5 are enabled by default for Browse/Compare. See `docs/mock-reference-data.md`.
+Until workstation connectors are wired, local mock mode uses one healthy environment-neutral reference file: `data/mock/reference_topology_2500.jsonl`. It contains exactly 2,500 hierarchical jobs across 25 synthetic four-digit business groups. AutoSys U1 is the default healthy reference projection. Process Scheduler U5 is materialized from the same source and receives a deterministic migration-problem overlay from `data/mock/u1_to_u5_migration_overlay.jsonl` (missing, failed, long-running, activated/waiting, on-ice/cancelled, slow-success execution-time regressions, timing and selected definition/dependency drift). Only AutoSys U1 and Process Scheduler U5 are enabled by default for Snapshots/Browse/Compare. See `docs/mock-reference-data.md`.
 
 ## Portable Git checkout (mock mode)
 
@@ -97,16 +97,30 @@ The tool can also be used independently of migration work as a scheduler topolog
 
 `ps-tool-web` retrieves scheduler topology snapshots through a common adapter interface and normalizes them into a shared domain model. This allows AutoSys and Process Scheduler data to be browsed and compared through the same UI even though the source systems expose different native concepts and schemas.
 
-The application currently supports three main workflows:
+The application currently supports four main workflows:
 
-### Browse
+### Snapshots
 
-The **Browse** view loads a single scheduler environment and presents its jobs as a hierarchical topology.
+The **Snapshots** view is the single ingress point for external scheduler data. It is the only UI workflow allowed to call scheduler adapters or the workstation bridge.
 
 Users can:
 
-- Select an environment and its configured scheduler type.
-- Select a business date or topology context.
+- Select an enabled scheduler environment.
+- Generate an AutoSys snapshot for the current business date.
+- For Process Scheduler, load the environment's topology list through the bridge, select one topology, and generate a snapshot for it.
+- Keep multiple immutable snapshots for the same environment/topology across different captures.
+- See the generated snapshot catalog, including capture time, source scope, job/dependency counts, and snapshot ID.
+
+Every successful capture is validated and stored under `SNAPSHOT_DIR` (default `data/runtime/snapshots`). A failed capture does not modify existing snapshots.
+
+### Browse
+
+The **Browse** view never contacts AutoSys, Process Scheduler, adapters, or the bridge. It only loads a snapshot that already exists in the local snapshot catalog.
+
+Users can:
+
+- Select an environment.
+- Select one previously generated snapshot for that environment.
 - Navigate job/box hierarchy using a lazily loaded tree.
 - Search jobs in the loaded snapshot.
 - Filter jobs by status.
@@ -115,7 +129,7 @@ Users can:
 
 ### Compare
 
-The **Compare** view compares two scheduler contexts side by side. The two sides may represent different environments, different scheduler technologies, or both.
+The **Compare** view compares two previously generated immutable snapshots side by side. It does not refresh or fetch scheduler data. The two sides may represent different environments, different scheduler technologies, different capture times, or any combination of those.
 
 The comparison engine:
 
@@ -130,13 +144,13 @@ The comparison engine:
 - Preserves optional field-level provenance for explaining normalized values.
 - Produces comparison coverage and mismatch summaries.
 - Supports side-by-side topology inspection and individual job details.
-- Provides filtering and search for large comparison results.
+- Provides filtering, search, and CSV export from the frozen comparison session.
 
-This workflow is intended to highlight migration gaps quickly rather than requiring operators to inspect both schedulers manually.
+This workflow is intended to highlight migration gaps quickly while guaranteeing that both sides remain stable throughout an analysis session.
 
 ### Settings
 
-The **Settings** view manages scheduler-specific environment definitions used by Browse and Compare. Process Scheduler and AutoSys are configured on separate tabs and persisted to separate YAML files.
+The **Settings** view manages scheduler-specific environment definitions used by Snapshots, Browse, and Compare. Process Scheduler and AutoSys are configured on separate tabs and persisted to separate YAML files.
 
 Each scheduler tab exposes only the operator-facing fields needed for connection management:
 
@@ -219,15 +233,22 @@ Comparison sessions can export:
 
 This allows findings to be reviewed outside the UI or attached to migration and validation workflows.
 
-### Current Comparison Snapshot
+### Immutable Snapshot Catalog
 
-The UI keeps exactly **one durable current comparison snapshot** rather than a historical snapshot catalog. A comparison captures both scheduler sides for the selected business date/run/topology, validates both snapshots, and then atomically publishes the pair under `data/runtime/current` (configurable with `CURRENT_SNAPSHOT_DIR`).
+Snapshots are durable, independent records rather than a single mutable left/right pair. Each successful generation creates a new `snapshot_id`, gzip-compressed payload, checksum, and catalog entry under `SNAPSHOT_DIR`. Existing snapshots are never overwritten by a new capture.
 
-`Compare snapshot` reuses the saved pair when the selected contexts match exactly, so repeated analysis does not re-fetch the schedulers. `Refresh & compare` forces both sources to be fetched again. If either source fetch or validation fails, the previous current snapshot remains unchanged. Changing an environment, business date/run, topology, endpoint, or filter makes the current pair stale for that request and causes a new pair to be captured.
+The data flow is intentionally one-way:
 
-Browse reuses the matching side of the current comparison snapshot when possible. Tree expansion, job details, search, comparison tables, and CSV exports use the frozen session snapshots, keeping one analysis internally consistent even while scheduler state continues to change. See `docs/current-snapshot.md` for the lifecycle and storage contract.
+```text
+Snapshots tab -> adapter / scheduler-bridge/v1 -> validate -> snapshot catalog
+Browse        -> snapshot catalog only
+Compare       -> snapshot catalog only
+Search/export -> loaded snapshot sessions/catalog only
+```
 
-A small in-memory LRU remains as an optimization for non-current exploratory loads; it is not the source of truth for the current comparison snapshot.
+For AutoSys, generation fixes the source context to the current business date. For Process Scheduler, the Snapshots view first requests available topologies through `list_roots`, then fetches only the selected topology. Browse and Compare expose neither business-date nor topology source controls because those choices are already frozen into the selected snapshot.
+
+This separation is the main source-isolation contract: replacing or refactoring Browse/Compare must not introduce adapter or bridge calls. See `docs/snapshots.md`.
 
 ## Intended Users
 
@@ -242,54 +263,62 @@ The tool is primarily intended for:
 
 The repository contains a working FastAPI web application with **mock AutoSys and Process Scheduler adapters** and sample scheduler data.
 
-The adapter abstraction is intentionally separated from the comparison logic. Real scheduler integrations are added by implementing `SchedulerAdapter` and explicitly registering trusted factories in `app/adapters/site.py`; source-specific behavior should not be added to the comparison service.
+The comparison engine is intentionally separated from bank connectivity. Real scheduler integration is out-of-process through the frozen `scheduler-bridge/v1` contract: `ExternalBridgeAdapter` invokes fixed scripts under `workstation_connectors/`, while the bank-local scripts call the existing AutoSys and Process Scheduler tools. Those scripts never import `app` and are git-ignored.
 
-The engine includes `TopologySnapshotBuilder`, strict adapter capability declarations, normalized-snapshot validation, field-level comparison provenance, identity-conflict protection, and a reusable adapter contract check. This allows the complete engine to be developed with synthetic data and the bank-internal AutoSys and Process Scheduler endpoint adapters to be added later.
+The engine includes `TopologySnapshotBuilder`, strict adapter capability declarations, normalized-snapshot validation, field-level comparison provenance, identity-conflict protection, and a reusable adapter contract check. The bridge translator converts the stable external v1 DTO into the current internal domain model, so the web engine can evolve without forcing workstation connector rewrites.
 
-When `USE_MOCK_ADAPTERS=true`, the application can be run locally without access to corporate scheduler systems. When real endpoint adapters are introduced, credentials/tokens/certificates should be supplied through approved bank secret management rather than committed configuration files. Process Scheduler's internal Cosmos DB access remains behind its service endpoint and is not accessed by this application.
+When `USE_MOCK_ADAPTERS=true`, the application runs without corporate scheduler access. On the bank workstation set it to `false` and provide `workstation_connectors/autosys_connector.py` and `workstation_connectors/process_scheduler_connector.py`. Credentials/tokens/certificates stay inside approved bank secret mechanisms and are never committed or passed in environment YAML.
+
+On a Windows workstation, preferably keep connectors in a persistent folder outside the replaceable web-project directory. Run `setup-workstation-connectors.cmd <persistent-directory>` once; it copies the frozen v1 templates without overwriting existing connector files, then set `PS_TOOL_CONNECTOR_DIR` to that directory in `.env`.
 
 ## Architecture Overview
 
 ```text
 Browser
   |
-  v
-FastAPI + Jinja2 + HTMX UI
+  +-- Snapshots ----------------------------------------------+
+  |      |                                                    |
+  |      v                                                    |
+  |   SnapshotGenerationService                               |
+  |      |                                                    |
+  |      v                                                    |
+  |   SchedulerAdapter -> ExternalBridgeAdapter               |
+  |      |              scheduler-bridge/v1 JSON              |
+  |      +------------> workstation connector scripts --------+--> bank scheduler tools/APIs
   |
-  +-- Browse / Compare / Search / Export / Settings routes
-  |
-  +-- Comparison, identity, topology and export services
-  |
-  +-- Shared scheduler domain model
-  |
-  +-- SchedulerAdapter interface
-        |
-        +-- AutoSys endpoint adapter ----------> bank AutoSys endpoint
-        +-- Process Scheduler endpoint adapter -> bank Process Scheduler endpoint -> internal Cosmos DB
+  |                         validated immutable snapshot
+  |                                      |
+  |                                      v
+  +-- Browse ----------------------> SnapshotCatalog <---------------- Compare
+  |                                      |                              |
+  +-- Search / Export -------------------+------------------------------+
 ```
 
-The application integrates only with scheduler service endpoints. Process Scheduler storage (including Cosmos DB) is intentionally opaque to this tool. The architecture keeps source-specific transport/DTO mapping behind adapters while the rest of the application works with normalized snapshots. Missing connector coverage is explicit: a real adapter should enable strict parameter support and declare each field as `supported`, `unsupported`, `unknown`, or `not_applicable`.
+`Snapshots` is the only web route group that reads an external scheduler. Browse, Compare, Search, and Export operate on persisted snapshots or in-memory sessions created from them. The portable application integrates with bank-local systems only through the fixed workstation connector scripts and the frozen `scheduler-bridge/v1` contract.
 
 ## Configuration
 
 | File | Purpose |
 |---|---|
-| `config/process_scheduler_environments.yaml` | Process Scheduler environment/host catalog and connector profiles |
-| `config/autosys_environments.yaml` | AutoSys environment/host catalog and connector profiles |
+| `config/process_scheduler_environments.yaml` | Process Scheduler environment/host catalog |
+| `config/autosys_environments.yaml` | AutoSys environment/host catalog |
 | `config/identity_map.yaml` | AutoSys ↔ Process Scheduler identity mappings and normalization rules |
 | `config/job_naming_rules.yaml` | Generic scheduler job-name structure and cross-environment identity rules |
 | `config/autosys_compare_parameters.yaml` | JIL/runtime parameters and timing threshold used for parity comparison |
-| `.env` | Runtime settings such as host, port, cache behavior, mock-adapter mode, and paths |
+| `.env` | Runtime settings such as host, port, cache behavior, mock mode, and workstation connector path/limits |
 | `.env.example` | Example runtime configuration |
 
 ## Main HTTP Endpoints
 
 | Method | Path | Purpose |
 |---|---|---|
-| `GET` | `/browse` | Browse a scheduler topology |
-| `POST` | `/api/browse/load` | Load a topology snapshot |
-| `GET` | `/compare` | Open the scheduler comparison workflow |
-| `POST` | `/api/compare` | Run a comparison |
+| `GET` | `/snapshots` | Generate and list immutable scheduler snapshots |
+| `GET` | `/api/snapshots/source-form` | Load source-specific generation controls/topologies |
+| `POST` | `/api/snapshots/generate` | Fetch, validate, and persist one source snapshot |
+| `GET` | `/browse` | Browse a generated snapshot |
+| `POST` | `/api/browse/load` | Load a generated snapshot from the local catalog |
+| `GET` | `/compare` | Open the generated-snapshot comparison workflow |
+| `POST` | `/api/compare` | Compare two generated snapshot IDs |
 | `GET` | `/api/search` | Search jobs in loaded snapshots |
 | `GET` | `/api/export/left.csv` | Export the left comparison snapshot |
 | `GET` | `/api/export/right.csv` | Export the right comparison snapshot |
@@ -325,28 +354,30 @@ Real adapters can be self-checked with:
 python -m app.adapters.check --environment <env> --scheduler <autosys|process_scheduler> --as-of <YYYY-MM-DD>
 ```
 
-See `docs/adapter-integration-guide.md` for the bank-side agent handoff contract.
+See `docs/adapter-integration-guide.md` and `docs/workstation-connector-protocol-v1.md` for the fixed bank-workstation handoff contract.
 
 ## Project Structure
 
 ```text
 app/
-  adapters/        Adapter contract, registry, snapshot builder, mock adapters, integration hook
-  routes/          FastAPI Browse, Compare, Search, Export and Settings routes
+  adapters/        Engine adapter interface, mock adapters, bridge v1 translator/client
+  routes/          FastAPI Snapshots, Browse, Compare, Search, Export and Settings routes
   search/          SQLite FTS search implementation
-  services/        Comparison, identity, topology, caching and export logic
+  services/        Snapshot catalog/generation, comparison, identity, topology and export logic
   templates/       Jinja2/HTMX web UI
   models.py        Shared scheduler and comparison domain models
 
 config/            Environment, identity and comparison configuration
-examples/          Sample AutoSys and Process Scheduler payloads
+examples/          Sample payloads and workstation connector templates
+workstation_connectors/  Git-ignored bank-local connector implementations
 docs/              Supporting implementation and field-mapping documentation
+contracts/         Frozen machine-readable scheduler-bridge/v1 schemas
 tests/             Automated test suite
 data/              Runtime/search data and UI preview assets
 ```
 
 ## Design Intent
 
-The central design goal is to keep **scheduler connectivity separate from migration validation logic**. Once both source systems are represented as normalized topology snapshots, comparison, search, export, filtering, and UI behavior remain scheduler-independent.
+The central design goal is to keep **scheduler connectivity confined to snapshot generation**. Once a source system is represented as an immutable normalized snapshot, Browse, Compare, search, export, filtering, and UI behavior remain scheduler-independent and cannot accidentally change underneath an analysis.
 
 This makes `ps-tool-web` suitable as a focused validation layer during scheduler migration while also providing a foundation for connecting real AutoSys and Process Scheduler data sources later.
