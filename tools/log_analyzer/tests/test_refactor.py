@@ -30,7 +30,7 @@ class RefactorRegressions(unittest.TestCase):
         self.config = self.home / "config.json"
         self.config.write_text(json.dumps({
             "environments": {"PROD": {"logs_root": str(self.root)}},
-            "incremental": {"read_workers": 2},
+            "incremental": {"parallel_workers": 2},
         }), encoding="utf-8")
         self.now = datetime(2026, 10, 7, tzinfo=timezone.utc)
 
@@ -100,12 +100,12 @@ class RefactorRegressions(unittest.TestCase):
 
     def test_menu_and_cli_share_same_policy_validation(self) -> None:
         data = json.loads(self.config.read_text(encoding="utf-8"))
-        data["incremental"]["read_workers"] = 99
-        with self.assertRaisesRegex(ValueError, "read_workers"):
+        data["incremental"]["parallel_workers"] = 99
+        with self.assertRaisesRegex(ValueError, "parallel_workers"):
             analyze.validate_config(data)
-        with self.assertRaisesRegex(ValueError, "read_workers"):
+        with self.assertRaisesRegex(ValueError, "parallel_workers"):
             menu.save_config(data, destination=self.config)
-        self.assertEqual(json.loads(self.config.read_text())["incremental"]["read_workers"], 2)
+        self.assertEqual(json.loads(self.config.read_text())["incremental"]["parallel_workers"], 2)
 
     def test_reject_unsupported_env_when_called_directly(self) -> None:
         with self.assertRaisesRegex(ValueError, "Unsupported environment"):

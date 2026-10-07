@@ -12,7 +12,7 @@ run.cmd PROD --mode inventory
 run.cmd PROD --mode enrich
 ```
 
-- **Inventory (default)**: uses only directory listing + filesystem metadata. Does not open `.log` contents even for new 100 MB files. Immediately writes `output/PROD/<COB>/jobs.csv` with COB, system, job name, relative path, byte size, last modification time, and activity. Detailed metrics remain **empty** (not zero); `job_status=Unknown`, `enrichment_status=Pending`.
+- **Inventory (default)**: uses only directory listing + filesystem metadata. Does not open `.log` contents even for new 100 MB files. Immediately writes `output/PROD/<COB>/jobs.csv` with COB, system, job name, full source path, byte size, last modification time, and activity. Detailed metrics remain **empty** (not zero); `job_status=Unknown`, `enrichment_status=Pending`.
 - **Enrich (explicit)**: visits open COBs and parses only `Pending`/`Stale`/modified files. Continues from the last completed-line checkpoint for append-only logs. Updates the **same CSV** with execution times, duration and warning/error/restart counters; `enrichment_status=Enriched`.
 - **Refresh**: running inventory again after log changes marks outdated rows `Stale` and clears old detailed metrics, without accessing the log contents. A subsequent enrich refreshes only those rows. Inventory never closes a COB on its own; enrichment can finalize an aged/quiet COB once **all** its rows are enriched.
 - **Existing state**: previous `.state` files are reused (without rereading unchanged enriched logs). Previously closed COBs remain skipped unless targeted with `--date YYYYMMDD --force`.
@@ -169,12 +169,12 @@ Settings in `config.json` (or the `9. Settings` menu):
   "min_active_days": 7,
   "quiet_hours": 72,
   "recent_minutes": 5,
-  "read_workers": 4,
+  "parallel_workers": 4,
   "cob_scan_limit": 7
 }
 ```
 
-`cob_scan_limit` controls how many of the newest existing root-level COB folders a normal run may process (default **7**, Settings option 8). It counts folders, not calendar days, so weekends/holidays with no folder do not consume the window. `recent_minutes` controls the diagnostic window, not COB finalization. It defaults to five minutes and can be edited in Settings option 6. `read_workers` sets the maximum number of simultaneous read-only source-log handles (default **4**, range 1-16); configure it using Settings option 7. Start with 4 on a shared corporate SMB volume and test 2 vs 4 vs 8 with IT/operations approval before increasing concurrency. The separate `min_active_days=7` finalization grace period covers weekends and ordinary delayed completions. Increase `min_active_days` or `quiet_hours` for unusually long-running jobs; changing either setting **does not reopen COBs already finalized**. For guaranteed finality, the upstream scheduler must provide an authoritative COB-completed event or marker; modification-time heuristics alone cannot prove a batch is finished.
+`cob_scan_limit` controls how many of the newest existing root-level COB folders a normal run may process (default **7**, Settings option 8). It counts folders, not calendar days, so weekends/holidays with no folder do not consume the window. `recent_minutes` controls the diagnostic window, not COB finalization. It defaults to five minutes and can be edited in Settings option 6. `parallel_workers` sets the maximum number of log files enriched concurrently (default **4**, range 1-16); configure it using Settings option 7. The implementation uses a bounded thread pool because enrichment is SMB/file-I/O bound; setting it to **8** means up to eight logs are parsed concurrently, not eight spawned Python OS processes. Start with 4 on a shared corporate SMB volume and test 2 vs 4 vs 8 with IT/operations approval before increasing concurrency. The separate `min_active_days=7` finalization grace period covers weekends and ordinary delayed completions. Increase `min_active_days` or `quiet_hours` for unusually long-running jobs; changing either setting **does not reopen COBs already finalized**. For guaranteed finality, the upstream scheduler must provide an authoritative COB-completed event or marker; modification-time heuristics alone cannot prove a batch is finished.
 
 **Operational use**: Schedule `run.cmd PROD --mode inventory` and `run.cmd PROD --mode enrich` separately with Windows Task Scheduler. The analyzer does not stay resident or watch files between invocations. Avoid very frequent scans when the share is busy; 15–30 minutes is a possible initial inventory interval after measuring SMB metadata load. One writer per environment/output root is enforced via `output/<ENV>/.analyzer.lock`. If a process was forcibly killed and left a lock, verify no analyzer process is running before deleting that lock file. Different environments can run independently.
 
@@ -182,11 +182,11 @@ Settings in `config.json` (or the `9. Settings` menu):
 
 - **Initial inventory:** no file content opened, independent of whether a log is 1 KiB or 100 MiB. The only source I/O is directory listing and metadata. The **first enrichment** later scans each pending file in 256 KiB read chunks. Exact full-file counts require reading content at least once.
 - **Appended logs:** each open COB manifest caches the last fully terminated line's **byte offset**, first/last timestamps, cumulative counters, last error, file identity, and small SHA-256 prefix anchors. On a safe append, only the newly appended suffix is parsed; the first 4 KiB and last 64 KiB of the *already parsed prefix* are checked to detect likely replacement/in-place rewrites. Depending on the old/new offsets this requires up to roughly 136 KiB of extra validation reads. File rotation/truncation or a detected rewrite falls back to a single full scan.
-- **Incomplete lines:** if a writer ends the snapshot partway through a line, its bytes are not committed to the checkpoint. They are read with the next append; a stable unchanged terminal line can be included after the `recent_minutes` threshold. UTF-8/UTF-8 BOM, UTF-16/UTF-32 with BOM, and normal single-byte encodings such as `cp1252` are supported. A pathological log line longer than 16 MiB is skipped safely (the last known report row is preserved).
+- **Incomplete lines:** if a writer ends the snapshot partway through a line, its bytes are not committed to the checkpoint. They are read with the next append; a stable unchanged terminal line can be included after the `recent_minutes` threshold. UTF-8/UTF-8 BOM, UTF-16/UTF-32 with BOM, BOM-less UTF-16 when its byte pattern is unambiguous, and normal single-byte encodings such as `cp1252` are supported. BOM/strong UTF-16 detection is performed per log file and can override a mismatched global encoding setting. A pathological log line longer than 16 MiB is skipped safely (the last known report row is preserved).
 - **Unchanged files:** read no source-log content. Directory entries supply metadata without unnecessary per-file `is_file`/`stat` calls; a completely unchanged COB does not rewrite either its CSV or manifest.
 - **Old COBs:** folders outside the newest `cob_scan_limit` window are not entered at all during normal runs, regardless of whether they are open or finalized in local state. Use explicit `--date YYYYMMDD` only for intentional historical recovery.
-- **Bounded concurrency:** a fixed pool of 4 read-only workers by default, at most 16 configurable; no unbounded task queue and no mass file opens. The source-file handle is always created with Win32 read-only access and `FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE` on Windows. Workers never write or lock any shared source file; output, checkpoints, and the process mutex are local only.
-- **Metadata/checkpoint integrity:** state from the previous version is still reused. On its first append change, a legacy file without a checkpoint gets one full scan; closed COBs remain closed. A hash of the small prefix samples does **not** mathematically prove the entire middle of a huge file was unchanged. If a producer rewrites old log content in place, use `--force` for that COB or connect an authoritative scheduler event/version.
+- **Bounded concurrency:** a fixed pool of 4 parallel read-only log workers by default, at most 16 configurable; no unbounded task queue and no mass file opens. The source-file handle is always created with Win32 read-only access and `FILE_SHARE_READ | FILE_SHARE_WRITE | FILE_SHARE_DELETE` on Windows. Workers never write or lock any shared source file; output, checkpoints, and the process mutex are local only.
+- **Metadata/checkpoint integrity:** timestamp-parser semantic changes bump the state version, so open manifests are rebuilt once with the current extraction rules. Closed COBs remain closed unless explicitly rebuilt with `--date ... --force`. A hash of the small prefix samples does **not** mathematically prove the entire middle of a huge file was unchanged. If a producer rewrites old log content in place, use `--force` for that COB or connect an authoritative scheduler event/version.
 
 **Local benchmark:** run `python tests/benchmark_perf.py` for a repeatable synthetic workload with 2,500 logs including one 100 MiB log. It measures initial metadata-only inventory separately from initial enrichment, no-op inventory/enrichment, and an append refresh. This is **not an SMB latency or throughput guarantee**; permissions, network metadata latency, AV scanning, and server load can dominate. Validate with a representative approved share.
 
@@ -196,23 +196,25 @@ Settings in `config.json` (or the `9. Settings` menu):
 
 | Column | Calculation |
 |---|---|
-| `job_date` | Nearest ancestor folder in `YYYYMMDD` format beneath the configured Logs root, **not** the log timestamp; e.g. `20261002` |
+| `job_date` | Business/COB date from the nearest `YYYYMMDD` source folder, rendered in CSV as `YYYY-MM-DD`; e.g. `2026-10-02` |
 | `system` | First directory directly under that COB folder, e.g. `Downstream`; blank when the log is directly under the date folder |
 | `job_name` | Log filename without `.log` (the native environment token remains intact) |
 | `job_status` | `Unknown` before enrichment; legacy value `Completed` after enrichment (**not proof of completion/success**). Use scheduler API for genuine status |
-| `last_modified_time` | Source-file mtime from filesystem metadata, ISO-8601 UTC |
-| `start_time` | First parseable log record timestamp |
-| `end_time` | Last parseable log record timestamp |
+| `last_modified_time` | Source-file mtime from filesystem metadata, rendered as `YYYY-MM-DD HH:MM:SS.mmm` (UTC value, no `T` or timezone suffix) |
+| `start_time` | First timestamp recognized by the ordered timestamp-model cascade near the beginning of a log record |
+| `end_time` | Last timestamp recognized by the ordered timestamp-model cascade near the beginning of a log record |
 | `duration` | Difference `end_time - start_time` as `HH:MM:SS`, with hours allowed above 24 |
+
+Timestamp extraction uses an ordered cascade instead of a single mask. The fast path handles ISO/YMD records such as `2026-08-01 07:44:57,678`, `2026/08/01 07:44:57:678`, `2026.08.01T07:44:57.678Z`, and offset forms such as `+02:00`. Fallback models support a short logger prefix before the timestamp, compact YMD (`20260801_074457.678`), European DMY (`01/08/2026 07:44:57,678`), and month names (`01-Aug-2026 ...`, `August 01, 2026 ...`). One- or two-digit month/day/hour, `_` date separators, `:` or `.` time separators, fractional seconds up to nanoseconds, and `AM/PM` are accepted. Fallback search is limited to the first 96 characters before the timestamp so a date mentioned later in a message is not treated as the record timestamp. Timestamp extraction does not require an `INFO/WARN/ERROR` severity token. Output is normalized to `YYYY-MM-DD HH:MM:SS.mmm`; sub-microsecond source precision is truncated to Python datetime precision before CSV millisecond formatting.
 | `restart_count` | Occurrences of the complete text following the first nonempty `INFO` record minus 1, minimum 0 |
 | `warning_count` | Count of timestamped `WARN`/`WARNING` records |
 | `error_count` | Count of timestamped `ERROR` records |
 | `last_error` | Full last timestamped `ERROR` line (including timestamp, thread, and message) |
 | `file_size_bytes` | Current file size from directory metadata; available during inventory |
 | `enrichment_status` | `Pending`: never parsed; `Enriched`: metrics match last known parsed content; `Stale`: file metadata changed after enrichment, detailed metrics deliberately cleared |
-| `enriched_at_utc` | UTC time of the last successful content extraction; empty in `Pending` and `Stale` rows |
+| `enriched_at_utc` | UTC time of the last successful content extraction, rendered as `YYYY-MM-DD HH:MM:SS.mmm`; empty in `Pending` and `Stale` rows |
 | `activity_status` | `RecentlyModified` if source mtime was within `recent_minutes` (default 5), `NotRecentlyModified` otherwise, `ClockSkew` if source timestamp is >60 seconds in the future. This does **not** prove the job is running or stopped |
-| `path` | Relative path inside the COB folder; disambiguates identical filenames in separate system/subfolders |
+| `path` | Full absolute source path to the `.log` file; disambiguates identical filenames in separate system/subfolders |
 
 Before enrichment, `start_time`, `end_time`, `duration`, WARN/ERROR/restart counts and `last_error` are **empty**. Blank counts mean *not measured*, not zero. When a file changes, inventory hides stale content metrics and sets `enrichment_status=Stale` until the next enrich succeeds.
 
@@ -232,7 +234,7 @@ For a source path like:
 \\ldnroot\data\IBCT\CVA\PROD\Logs\20261002\Downstream\IB_CT_CVA_1109_P1_DS_FG_OTCC_DMOReport_Frtb.log
 ```
 
-`job_date` is `20261002` and `system` is `Downstream`, while start/end can legitimately be on `2026-10-05`. The directory identifies the business date, not necessarily the log's calendar date. For example, `Logs\20261002\Upstream\Subfolder\job.log` gives `system=Upstream`.
+`job_date` is `2026-10-02` in CSV and `system` is `Downstream`, while start/end can legitimately be on `2026-10-05`. The directory identifies the business date, not necessarily the log's calendar date. For example, `Logs\20261002\Upstream\Subfolder\job.log` gives `system=Upstream`.
 
 ## Production safety for Windows UNC / SMB shares
 
@@ -241,7 +243,7 @@ For a source path like:
 - Exactly one analyzer per environment/output directory is enforced with `output/<ENV>/.analyzer.lock`. **This file is not on the log source share unless you explicitly configure output onto that share.** Output must be separate from source; using an output directory that contains the source or is inside it is rejected.
 - Inventory is metadata-only with no concurrent source-content readers. Enrichment uses a bounded pool of up to 4 concurrent read-only readers by default. Directory listing/stat and any enrichment reads still generate SMB traffic, so absolute zero production impact cannot be guaranteed.
 - `mtime` is not a heartbeat: writers can buffer logs; metadata may be cached by SMB; timestamps may have clock skew. Five minutes is a diagnostic freshness window, not a Running/Stopped determination. A job can still be running with `NotRecentlyModified`.
-- Existing *open* manifests and reports with the previous row schema migrate to the new CSV columns without reopening unchanged log contents; legacy `relative_path` is renamed to `path`. Already finalized COBs are left alone by design; run `run.cmd PROD --mode inventory --date YYYYMMDD --force` and then `run.cmd PROD --mode enrich --date YYYYMMDD` to rebuild a specific older report.
+- Parser/state version changes invalidate older open manifests so timestamps and full source paths are rebuilt with current extraction rules. Already finalized COBs are left alone by design; run `run.cmd PROD --mode inventory --date YYYYMMDD --force` and then `run.cmd PROD --mode enrich --date YYYYMMDD --force` to rebuild a specific older report.
 
 ## Error handling and limitations
 

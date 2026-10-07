@@ -22,7 +22,7 @@
     "min_active_days": 7,
     "quiet_hours": 72,
     "recent_minutes": 5,
-    "read_workers": 4,
+    "parallel_workers": 4,
     "cob_scan_limit": 7
   }
 }

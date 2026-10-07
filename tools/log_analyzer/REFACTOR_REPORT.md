@@ -7,7 +7,7 @@ Audited and refactored the standalone Python 3.11+ log analyzer supplied in `log
 The following **behavior is deliberately unchanged**:
 
 - `inventory` (default) reads only directory entries and filesystem metadata; no source `.log` content is opened.
-- `enrich` opens source logs **read-only**, uses up to `read_workers` bounded concurrent workers, and resumes append-only files from completed-line byte checkpoints.
+- `enrich` opens source logs **read-only**, uses up to `parallel_workers` bounded concurrent workers, and resumes append-only files from completed-line byte checkpoints.
 - Reports remain at `output/<ENV>/<YYYYMMDD>/jobs.csv`, with an environment-specific incremental state in `.state/<YYYYMMDD>.json`.
 - PROD, U5, U1, and U6 are the only approved environments. Their configured source paths remain unchanged.
 - Interactive terminal progress and ETA stay available; redirected stdout remains plain-text.

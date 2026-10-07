@@ -19,7 +19,7 @@ import stat as statmod
 import tempfile
 from dataclasses import dataclass
 from functools import lru_cache
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Iterator, NamedTuple, TextIO
 
@@ -49,13 +49,115 @@ CSV_FIELDS = (
     "path",
 )
 
-# Observed log4net-style record: 2026-10-05 00:01:01,993 [1] INFO : message
-# A line without a record prefix is a continuation, not a new event.
-LOG_RECORD = re.compile(
-    r"^\ufeff?\s*(?P<timestamp>\d{4}-\d{2}-\d{2}[ T]\d{2}:\d{2}:\d{2}"
-    r"(?:[,.]\d{1,6})?)\s+(?:\[[^\]\r\n]+\]\s+)?"
-    r"(?P<level>TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL|CRITICAL)"
-    r"\s*:?\s*(?P<message>.*)$",
+# Timestamp extraction is deliberately model-based rather than one giant regex.
+# The common YMD model is a fast path; less common layouts are tried only when
+# it fails. Fallback search is restricted to the beginning of a record so dates
+# mentioned later in a message are not mistaken for the record timestamp.
+_TIMESTAMP_SEARCH_CHARS = 192
+_TIMESTAMP_MAX_PREFIX_CHARS = 96
+_MONTHS = {
+    "jan": 1, "january": 1, "feb": 2, "february": 2,
+    "mar": 3, "march": 3, "apr": 4, "april": 4,
+    "may": 5, "jun": 6, "june": 6, "jul": 7, "july": 7,
+    "aug": 8, "august": 8, "sep": 9, "sept": 9, "september": 9,
+    "oct": 10, "october": 10, "nov": 11, "november": 11,
+    "dec": 12, "december": 12,
+}
+
+# yyyy-MM-dd / yyyy/MM/dd / yyyy.MM.dd, including mixed separators,
+# ISO T, optional fractional seconds, and optional UTC/offset suffix.
+_FAST_YMD_TIMESTAMP = re.compile(
+    r"^\ufeff?\s*[\[(<{]?\s*"
+    r"(?P<timestamp>"
+    r"(?P<year>\d{4})[-/._](?P<month>\d{1,2})[-/._](?P<day>\d{1,2})(?:T|\s+)"
+    r"(?P<hour>\d{1,2})[:.](?P<minute>\d{2})[:.](?P<second>\d{2})"
+    r"(?:[,.:](?P<fraction>\d{1,9}))?"
+    r"(?:\s*(?P<ampm>AM|PM))?"
+    r"(?:\s*(?P<tz>Z|[+-]\d{2}:?\d{2}))?"
+    r")",
+    re.IGNORECASE,
+)
+
+# Same YMD model but searchable after a short prefix such as
+# "INFO |", "[worker-1]", or another logger-specific marker.
+_SEARCH_YMD_TIMESTAMP = re.compile(
+    r"(?<!\d)"
+    r"(?P<timestamp>"
+    r"(?P<year>\d{4})[-/._](?P<month>\d{1,2})[-/._](?P<day>\d{1,2})(?:T|\s+)"
+    r"(?P<hour>\d{1,2})[:.](?P<minute>\d{2})[:.](?P<second>\d{2})"
+    r"(?:[,.:](?P<fraction>\d{1,9}))?"
+    r"(?:\s*(?P<ampm>AM|PM))?"
+    r"(?:\s*(?P<tz>Z|[+-]\d{2}:?\d{2}))?"
+    r")",
+    re.IGNORECASE,
+)
+
+# 20260801 074457.678 / 20260801_074457 / 20260801-074457,678
+_COMPACT_YMD_TIMESTAMP = re.compile(
+    r"(?<!\d)"
+    r"(?P<timestamp>"
+    r"(?P<year>\d{4})(?P<month>\d{2})(?P<day>\d{2})[ T_-]"
+    r"(?P<hour>\d{2})(?::?)(?P<minute>\d{2})(?::?)(?P<second>\d{2})"
+    r"(?:[,.:](?P<fraction>\d{1,9}))?"
+    r"(?:\s*(?P<ampm>AM|PM))?"
+    r"(?:\s*(?P<tz>Z|[+-]\d{2}:?\d{2}))?"
+    r")",
+    re.IGNORECASE,
+)
+
+# European numeric order. Ambiguous values such as 01/08/2026 intentionally
+# resolve as DMY; this matches the deployment locale and avoids silently
+# switching interpretation from line to line.
+_DMY_TIMESTAMP = re.compile(
+    r"(?<!\d)"
+    r"(?P<timestamp>"
+    r"(?P<day>\d{1,2})[-/._](?P<month>\d{1,2})[-/._](?P<year>\d{4})(?:T|\s+)"
+    r"(?P<hour>\d{1,2})[:.](?P<minute>\d{2})[:.](?P<second>\d{2})"
+    r"(?:[,.:](?P<fraction>\d{1,9}))?"
+    r"(?:\s*(?P<ampm>AM|PM))?"
+    r"(?:\s*(?P<tz>Z|[+-]\d{2}:?\d{2}))?"
+    r")",
+    re.IGNORECASE,
+)
+
+# 01-Aug-2026 07:44:57.678 / 01 August 2026 07:44:57
+_DMY_MONTH_NAME_TIMESTAMP = re.compile(
+    r"(?<!\w)"
+    r"(?P<timestamp>"
+    r"(?P<day>\d{1,2})[-/ .](?P<month_name>[A-Za-z]{3,9})[-/ .](?P<year>\d{4})[ T]+"
+    r"(?P<hour>\d{1,2})[:.](?P<minute>\d{2})[:.](?P<second>\d{2})"
+    r"(?:[,.:](?P<fraction>\d{1,9}))?"
+    r"(?:\s*(?P<ampm>AM|PM))?"
+    r")",
+    re.IGNORECASE,
+)
+
+# Aug 01 2026 07:44:57 / August 01, 2026 07:44:57.678
+_MDY_MONTH_NAME_TIMESTAMP = re.compile(
+    r"(?<!\w)"
+    r"(?P<timestamp>"
+    r"(?P<month_name>[A-Za-z]{3,9})\s+(?P<day>\d{1,2})(?:,)?\s+(?P<year>\d{4})[ T]+"
+    r"(?P<hour>\d{1,2})[:.](?P<minute>\d{2})[:.](?P<second>\d{2})"
+    r"(?:[,.:](?P<fraction>\d{1,9}))?"
+    r"(?:\s*(?P<ampm>AM|PM))?"
+    r")",
+    re.IGNORECASE,
+)
+
+_TIMESTAMP_MODELS = (
+    ("ymd_search", _SEARCH_YMD_TIMESTAMP),
+    ("compact_ymd", _COMPACT_YMD_TIMESTAMP),
+    ("dmy_numeric", _DMY_TIMESTAMP),
+    ("dmy_month_name", _DMY_MONTH_NAME_TIMESTAMP),
+    ("mdy_month_name", _MDY_MONTH_NAME_TIMESTAMP),
+)
+
+# Level detection is independent of timestamp layout. It is only applied to a
+# line where one of the timestamp models succeeded, preventing continuation
+# text containing words such as ERROR/WARN from being counted as a log record.
+LOG_LEVEL = re.compile(
+    r"(?:^|[\s\]|}>|:-])(?P<level>TRACE|DEBUG|INFO|WARN|WARNING|ERROR|FATAL|CRITICAL)"
+    r"(?:\s*:|\s+-|\s+|$)(?P<message>.*)$",
     re.IGNORECASE,
 )
 DATE_FOLDER = re.compile(r"^\d{8}$")
@@ -80,18 +182,151 @@ class FileSummary:
     last_error: str
 
 
-def parse_timestamp(raw: str) -> datetime:
-    return datetime.fromisoformat(raw.replace(",", "."))
+def _fraction_to_microseconds(value: str | None) -> int:
+    digits = value or ""
+    # Python datetime stores microseconds. Nanosecond logs are truncated rather
+    # than rounded so start/end ordering cannot be moved across a boundary.
+    return int((digits[:6]).ljust(6, "0")) if digits else 0
 
+
+def _datetime_from_match(match: re.Match[str]) -> datetime:
+    groups = match.groupdict()
+    month_name = groups.get("month_name")
+    if month_name:
+        month = _MONTHS.get(month_name.lower())
+        if month is None:
+            raise ValueError(f"unsupported month name: {month_name!r}")
+    else:
+        month = int(groups["month"])
+    hour = int(groups["hour"])
+    ampm = groups.get("ampm")
+    if ampm:
+        if not 1 <= hour <= 12:
+            raise ValueError("12-hour timestamp has an invalid hour")
+        hour %= 12
+        if ampm.upper() == "PM":
+            hour += 12
+
+    tzinfo = None
+    tz_text = groups.get("tz")
+    if tz_text:
+        if tz_text.upper() == "Z":
+            tzinfo = timezone.utc
+        else:
+            sign = 1 if tz_text[0] == "+" else -1
+            compact = tz_text[1:].replace(":", "")
+            hours = int(compact[:2])
+            minutes = int(compact[2:])
+            if hours > 23 or minutes > 59:
+                raise ValueError("timestamp has an invalid UTC offset")
+            tzinfo = timezone(sign * timedelta(hours=hours, minutes=minutes))
+
+    return datetime(
+        int(groups["year"]), month, int(groups["day"]),
+        hour, int(groups["minute"]), int(groups["second"]),
+        _fraction_to_microseconds(groups.get("fraction")), tzinfo=tzinfo,
+    )
+
+
+def extract_timestamp(raw: str) -> tuple[datetime, int, str] | None:
+    """Extract a record timestamp using ordered parsing models.
+
+    Returns ``(datetime, match_end, model_name)``. The common YMD-at-start
+    format is checked first; fallback models scan only a short record prefix.
+    Invalid calendar values are ignored and the next model is tried.
+    """
+    fast = _FAST_YMD_TIMESTAMP.match(raw)
+    if fast is not None:
+        try:
+            return _datetime_from_match(fast), fast.end(), "ymd_prefix"
+        except ValueError:
+            pass
+
+    prefix = raw[:_TIMESTAMP_SEARCH_CHARS]
+    for name, model in _TIMESTAMP_MODELS:
+        match = model.search(prefix)
+        if match is None or match.start() > _TIMESTAMP_MAX_PREFIX_CHARS:
+            continue
+        try:
+            return _datetime_from_match(match), match.end(), name
+        except ValueError:
+            continue
+    return None
+
+
+def parse_timestamp(raw: str) -> datetime:
+    """Parse a standalone timestamp using the same models as log records."""
+    result = extract_timestamp(raw.strip())
+    if result is None:
+        raise ValueError(f"unsupported timestamp format: {raw!r}")
+    value, end, _ = result
+    # Standalone normalization must not silently accept arbitrary trailing text.
+    trailing = raw.strip()[end:].strip(" \t\r\n[](){}<>")
+    if trailing:
+        raise ValueError(f"unsupported timestamp format: {raw!r}")
+    return value
 
 def format_timestamp(value: datetime | None) -> str:
-    return value.isoformat(sep=" ", timespec="milliseconds") if value else ""
+    """Format CSV timestamps uniformly as YYYY-MM-DD HH:MM:SS.mmm.
+
+    Timezone-aware values keep their represented wall-clock value but omit the
+    ISO timezone suffix in CSV. Fields whose names explicitly state UTC (for
+    example ``enriched_at_utc``) are converted to UTC before this formatter.
+    """
+    if value is None:
+        return ""
+    return value.strftime("%Y-%m-%d %H:%M:%S.%f")[:-3]
+
+
+def normalize_csv_datetime(value: object) -> str:
+    """Normalize current and legacy cached datetime strings for CSV output."""
+    if value in (None, ""):
+        return ""
+    if isinstance(value, datetime):
+        return format_timestamp(value)
+    text = str(value).strip()
+    try:
+        parsed = datetime.fromisoformat(text.replace("Z", "+00:00"))
+    except ValueError:
+        try:
+            parsed = parse_timestamp(text)
+        except ValueError:
+            return text
+    return format_timestamp(parsed)
+
+
+def normalize_csv_job_date(value: object) -> str:
+    """Render a COB/business date as YYYY-MM-DD in CSV without changing its key."""
+    if value in (None, ""):
+        return ""
+    text = str(value).strip()
+    try:
+        return datetime.strptime(text, "%Y%m%d").strftime("%Y-%m-%d")
+    except ValueError:
+        try:
+            return datetime.fromisoformat(text).strftime("%Y-%m-%d")
+        except ValueError:
+            return text
+
+
+def normalize_csv_temporal_fields(row: dict[str, object]) -> dict[str, object]:
+    """Return a CSV-only copy with every date/time field in one display format."""
+    normalized = dict(row)
+    normalized["job_date"] = normalize_csv_job_date(normalized.get("job_date"))
+    for field in ("last_modified_time", "start_time", "end_time", "enriched_at_utc"):
+        normalized[field] = normalize_csv_datetime(normalized.get(field))
+    return normalized
 
 
 def format_duration(seconds: int) -> str:
     hours, remainder = divmod(seconds, 3600)
     minutes, secs = divmod(remainder, 60)
     return f"{hours:02d}:{minutes:02d}:{secs:02d}"
+
+
+def full_source_path(file_path: Path) -> str:
+    """Return the absolute source path without resolving symlinks or touching the file."""
+    return os.path.abspath(os.fspath(file_path))
 
 
 def source_metadata_from_path(file_path: Path, root: Path) -> tuple[str | None, str]:
@@ -201,26 +436,38 @@ ANCHOR_HEAD_BYTES = 4 * 1024
 
 
 def _new_accumulator() -> dict:
-    return {"start": "", "finish": "", "first_info": "", "occurrences": 0,
-            "warnings": 0, "errors": 0, "last_error": "", "offset": 0}
+    return {"start": "", "finish": "", "start_iso": "", "finish_iso": "",
+            "first_info": "", "occurrences": 0, "warnings": 0, "errors": 0,
+            "last_error": "", "offset": 0, "timestamp_model": ""}
 
 
 def _record(raw: str, data: dict) -> None:
-    match = LOG_RECORD.match(raw)
+    extracted = extract_timestamp(raw)
+    if extracted is None:
+        if data["first_info"]:
+            data["occurrences"] += raw.count(data["first_info"])
+        return
+
+    value, timestamp_end, model = extracted
+    stamp = format_timestamp(value)
+    if not data["start"]:
+        data["start"] = stamp
+        data["start_iso"] = value.isoformat()
+    data["finish"] = stamp
+    data["finish_iso"] = value.isoformat()
+    if not data.get("timestamp_model"):
+        data["timestamp_model"] = model
+
+    # Search for a severity only after the timestamp. This handles logger
+    # prefixes/wrappers while avoiding false ERROR/WARN hits in continuation
+    # lines and timestamps embedded later in the message body.
+    remainder = raw[timestamp_end:]
+    match = LOG_LEVEL.search(remainder)
     if match:
-        try:
-            stamp = format_timestamp(parse_timestamp(match.group("timestamp")))
-        except ValueError:
-            stamp = ""
-        if stamp:
-            if not data["start"]:
-                data["start"] = stamp
-            data["finish"] = stamp
         level = match.group("level").upper()
-        if level == "INFO" and not data["first_info"]:
-            candidate = match.group("message").strip()
-            if candidate:
-                data["first_info"] = candidate
+        message = match.group("message").strip()
+        if level == "INFO" and not data["first_info"] and message:
+            data["first_info"] = message
         if level in ("WARN", "WARNING"):
             data["warnings"] += 1
         elif level == "ERROR":
@@ -229,13 +476,14 @@ def _record(raw: str, data: dict) -> None:
     if data["first_info"]:
         data["occurrences"] += raw.count(data["first_info"])
 
-
 def _summary(data: dict, file_path: Path, job_date: str, system: str) -> FileSummary:
     duration = ""
     if data["start"] and data["finish"]:
-        start = datetime.fromisoformat(data["start"])
-        finish = datetime.fromisoformat(data["finish"])
-        if finish >= start:
+        start = datetime.fromisoformat(data.get("start_iso") or data["start"])
+        finish = datetime.fromisoformat(data.get("finish_iso") or data["finish"])
+        # Python forbids ordering aware and naive datetimes. A single log should
+        # not mix those models; if it does, leave duration blank rather than guess.
+        if (start.tzinfo is None) == (finish.tzinfo is None) and finish >= start:
             duration = format_duration(int((finish - start).total_seconds()))
     return FileSummary(
         job_date=job_date, system=system, job_name=file_path.stem,
@@ -247,8 +495,47 @@ def _summary(data: dict, file_path: Path, job_date: str, system: str) -> FileSum
     )
 
 
+def _detected_unicode_encoding(stream: io.BufferedReader) -> str | None:
+    """Detect BOM-marked Unicode and strong BOM-less UTF-16 signatures.
+
+    A wrong global encoding commonly produces ``no parseable timestamps`` while
+    the file itself is valid. Detection is intentionally conservative and only
+    overrides the configured codec for unmistakable Unicode layouts.
+    """
+    location = stream.tell()
+    try:
+        stream.seek(0)
+        sample = stream.read(4096)
+    finally:
+        stream.seek(location)
+    if sample.startswith(b"\xff\xfe\x00\x00"):
+        return "utf-32-le"
+    if sample.startswith(b"\x00\x00\xfe\xff"):
+        return "utf-32-be"
+    if sample.startswith(b"\xff\xfe"):
+        return "utf-16-le"
+    if sample.startswith(b"\xfe\xff"):
+        return "utf-16-be"
+    if sample.startswith(b"\xef\xbb\xbf"):
+        return "utf-8-sig"
+
+    # BOM-less UTF-16 logs are common with older .NET writers. Require a strong
+    # alternating-NUL signal to avoid treating arbitrary/binary content as text.
+    if len(sample) >= 32:
+        even = sample[0::2]
+        odd = sample[1::2]
+        even_zero = even.count(0) / max(1, len(even))
+        odd_zero = odd.count(0) / max(1, len(odd))
+        if odd_zero >= 0.60 and even_zero <= 0.10:
+            return "utf-16-le"
+        if even_zero >= 0.60 and odd_zero <= 0.10:
+            return "utf-16-be"
+    return None
+
+
 def _line_codec(stream: io.BufferedReader, encoding: str) -> tuple[str, bytes, int]:
-    name = codecs.lookup(encoding).name
+    detected = _detected_unicode_encoding(stream)
+    name = detected or codecs.lookup(encoding).name
     if name == "utf-16":
         location = stream.tell()
         stream.seek(0)
@@ -283,7 +570,6 @@ def _line_codec(stream: io.BufferedReader, encoding: str) -> tuple[str, bytes, i
     if name == "utf-7":
         raise UnicodeError(f"unsupported checkpoint encoding: {encoding}")
     return name, b"\n", 1
-
 
 def _snapshot_lines(stream: io.BufferedReader, *, offset: int, limit: int,
                     separator: bytes, alignment: int) -> Iterator[tuple[bytes, int, bool]]:
@@ -491,11 +777,11 @@ def resolve_root(config_path: Path, environment: str, *, config: dict | None = N
 
 
 # Bump when CSV extraction semantics or the on-disk state shape change.
-STATE_VERSION = 1
+STATE_VERSION = 4
 DEFAULT_MIN_ACTIVE_DAYS = 7
 DEFAULT_QUIET_HOURS = 72
 DEFAULT_RECENT_MINUTES = 5
-DEFAULT_READ_WORKERS = 4
+DEFAULT_PARALLEL_WORKERS = 4
 DEFAULT_COB_SCAN_LIMIT = 7
 
 
@@ -504,7 +790,7 @@ class IncrementalPolicy:
     min_active_days: int = DEFAULT_MIN_ACTIVE_DAYS
     quiet_hours: int = DEFAULT_QUIET_HOURS
     recent_minutes: int = DEFAULT_RECENT_MINUTES
-    read_workers: int = DEFAULT_READ_WORKERS
+    parallel_workers: int = DEFAULT_PARALLEL_WORKERS
     cob_scan_limit: int = DEFAULT_COB_SCAN_LIMIT
 
 
@@ -515,13 +801,15 @@ def policy_from_config(config: dict) -> IncrementalPolicy:
     days = options.get("min_active_days", DEFAULT_MIN_ACTIVE_DAYS)
     hours = options.get("quiet_hours", DEFAULT_QUIET_HOURS)
     recent_minutes = options.get("recent_minutes", DEFAULT_RECENT_MINUTES)
-    workers = options.get("read_workers", DEFAULT_READ_WORKERS)
+    # ``read_workers`` is accepted as a compatibility alias for configs from
+    # earlier releases. New configs/settings persist the clearer name.
+    workers = options.get("parallel_workers", options.get("read_workers", DEFAULT_PARALLEL_WORKERS))
     cob_scan_limit = options.get("cob_scan_limit", DEFAULT_COB_SCAN_LIMIT)
     for name, value in (("min_active_days", days), ("quiet_hours", hours), ("recent_minutes", recent_minutes)):
         if type(value) is not int or value < 1 or value > 87600:
             raise ValueError(f"incremental.{name} must be an integer between 1 and 87600")
     if type(workers) is not int or not 1 <= workers <= 16:
-        raise ValueError("incremental.read_workers must be an integer from 1 to 16")
+        raise ValueError("incremental.parallel_workers must be an integer from 1 to 16")
     if type(cob_scan_limit) is not int or not 1 <= cob_scan_limit <= 10000:
         raise ValueError("incremental.cob_scan_limit must be an integer from 1 to 10000")
     return IncrementalPolicy(days, hours, recent_minutes, workers, cob_scan_limit)
@@ -700,6 +988,7 @@ def atomic_csv(path: Path, files: dict, delimiter: str) -> None:
                 # Older manifests may omit newer columns; never let arbitrary
                 # extension fields leak into CSV or abort an atomic refresh.
                 row = {field: cached.get(field, "") for field in CSV_FIELDS}
+                row = normalize_csv_temporal_fields(row)
                 for field in ("system", "job_name", "last_error", "path"):
                     value = row[field]
                     row[field] = excel_safe(str(value)) if value is not None else ""
@@ -739,7 +1028,7 @@ def activity_fields(mtime_ns: int, now: datetime, recent_minutes: int) -> dict[s
     else:
         activity = "NotRecentlyModified"
     modified = datetime.fromtimestamp(mtime_ns / 1_000_000_000, tz=timezone.utc)
-    return {"activity_status": activity, "last_modified_time": modified.isoformat(timespec="milliseconds")}
+    return {"activity_status": activity, "last_modified_time": format_timestamp(modified)}
 
 
 def inventory_row(log_path: Path, cob: str, system: str, key: str,
@@ -751,7 +1040,7 @@ def inventory_row(log_path: Path, cob: str, system: str, key: str,
         **activity_fields(signature[1], now, policy.recent_minutes),
         "start_time": "", "end_time": "", "duration": "",
         "restart_count": "", "warning_count": "", "error_count": "", "last_error": "",
-        "path": key, "file_size_bytes": signature[0],
+        "path": full_source_path(log_path), "file_size_bytes": signature[0],
         "enrichment_status": "Pending", "enriched_at_utc": "",
     }
 
@@ -795,7 +1084,7 @@ def inventory_cob(
                 parsed_sig = old.get("signature")
             if old.get("signature") == signature:
                 row = {**base, **prev_row, **activity_fields(signature[1], now, policy.recent_minutes),
-                       "path": key, "file_size_bytes": signature[0],
+                       "path": full_source_path(log_path), "file_size_bytes": signature[0],
                        "enrichment_status": enrich_status(prev_row)}
                 cached += 1
             else:
@@ -953,9 +1242,9 @@ def update_cob(
                 raise OSError("source was replaced or truncated during parsing; retry next run")
             row = {**vars(result.summary),
                    **activity_fields(result.signature[1], now, policy.recent_minutes),
-                   "path": key, "file_size_bytes": result.signature[0],
+                   "path": full_source_path(log_path), "file_size_bytes": result.signature[0],
                    "enrichment_status": "Enriched",
-                   "enriched_at_utc": now.astimezone(timezone.utc).isoformat()}
+                   "enriched_at_utc": format_timestamp(now.astimezone(timezone.utc))}
             files[key] = {"signature": result.signature, "row": row,
                           "checkpoint": result.checkpoint, "anchor": result.anchor,
                           "identity": result.identity, "parsed_signature": result.signature}
@@ -969,7 +1258,11 @@ def update_cob(
                 full_scans += 1
             latest_mtime_ns = max(latest_mtime_ns, result.signature[1])
             if not result.summary.start_time or not result.summary.end_time:
-                print(f"WARN: no parseable timestamps in: {log_path}", file=stderr)
+                print(
+                    "WARN: no parseable timestamps after format cascade "
+                    f"(YMD/ISO, compact YMD, DMY, month-name; Unicode auto-detect): {log_path}",
+                    file=stderr,
+                )
             elif not result.summary.duration:
                 print(f"WARN: last timestamp precedes first: {log_path}", file=stderr)
         except (OSError, UnicodeError, ValueError) as exc:
@@ -982,7 +1275,7 @@ def update_cob(
 
     # On any directory enumeration failure the context manager drains worker
     # threads, and the exception aborts before publishing any partial report.
-    with ThreadPoolExecutor(max_workers=policy.read_workers, thread_name_prefix="smb-log") as pool:
+    with ThreadPoolExecutor(max_workers=policy.parallel_workers, thread_name_prefix="smb-log") as pool:
         for log in iter_cob_logs(folder, stderr, progress):
             if log is None:
                 skipped += 1
@@ -1010,7 +1303,7 @@ def update_cob(
                              and not old["checkpoint"].get("tail_included", False)
                              and now.timestamp() - stat.st_mtime_ns / 1e9 > policy.recent_minutes * 60)):
                     new_row = {**old["row"], **activity_fields(stat.st_mtime_ns, now, policy.recent_minutes),
-                               "path": key, "file_size_bytes": stat.st_size,
+                               "path": full_source_path(log_path), "file_size_bytes": stat.st_size,
                                "enrichment_status": "Enriched",
                                "enriched_at_utc": old["row"].get("enriched_at_utc", "")}
                     if new_row != old["row"]:
@@ -1030,7 +1323,7 @@ def update_cob(
                 if progress is not None:
                     progress.file_queued(key)
                 pending.append((key, old, log_path, future))
-                if len(pending) >= 2 * policy.read_workers:
+                if len(pending) >= 2 * policy.parallel_workers:
                     flush_one()
             except (OSError, UnicodeError) as exc:
                 skipped += 1
@@ -1080,7 +1373,7 @@ def update_cob(
         print(f"UNCHANGED: {cob} ({cached} cached jobs; report untouched)", file=stdout)
 
     print(f"I/O: full scans {full_scans}; suffix scans {suffix_scans}; "
-          f"payload bytes scanned {bytes_read:,}; workers {policy.read_workers}", file=stdout)
+          f"payload bytes scanned {bytes_read:,}; parallel workers {policy.parallel_workers}", file=stdout)
     warnings = sum(int(entry["row"].get("warning_count") or 0) for entry in files.values())
     errors = sum(int(entry["row"].get("error_count") or 0) for entry in files.values())
     return CobResult(parsed, cached, skipped, warnings, errors, int(changed), int(close), removed)

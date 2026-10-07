@@ -73,7 +73,7 @@ class MenuTests(unittest.TestCase):
         self.assertIn("Start enrichment? [y/N]: ", prompts)
         with (self.output / "U5" / "20261002" / "jobs.csv").open("r", encoding="utf-8-sig", newline="") as stream:
             result = next(csv.DictReader(stream))
-        self.assertEqual(result["job_date"], "20261002")
+        self.assertEqual(result["job_date"], "2026-10-02")
         self.assertEqual(result["system"], "Nested")
         self.assertEqual(result["job_status"], "Completed")
         self.assertEqual(result["job_name"], "IB_CT_CVA_4321_U5_Load")
@@ -153,17 +153,17 @@ class MenuTests(unittest.TestCase):
         self.assertEqual(config["incremental"]["cob_scan_limit"], 9)
         self.assertIn("Latest COB folders to scan", out)
 
-    def test_settings_accepts_bounded_smb_readers(self):
+    def test_settings_accepts_parallel_workers(self):
         config_path = self.work / "input.json"
         config_path.write_text(json.dumps({
             "encoding": "utf-8-sig", "environments": {"PROD": {"logs_root": str(self.logs.parents[1])}}
         }))
-        answers = iter(["9", "7", "6", "0", "0"])
+        answers = iter(["9", "7", "8", "0", "0"])
         output = StringIO()
         app = menu.ConsoleMenu(read=lambda _: next(answers), output=output,
                                        config_path=config_path)
         self.assertEqual(app.run(), 0)
-        self.assertEqual(json.loads(config_path.read_text())["incremental"]["read_workers"], 6)
+        self.assertEqual(json.loads(config_path.read_text())["incremental"]["parallel_workers"], 8)
 
     def test_invalid_json_preflight_detected(self):
         self.source.write_text("broken json", encoding="utf-8")

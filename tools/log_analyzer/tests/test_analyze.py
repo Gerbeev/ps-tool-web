@@ -74,6 +74,87 @@ class LogAnalyzerTests(unittest.TestCase):
         self.assertTrue(summary.last_error.startswith("2026-10-05 00:20:05,901"))
         self.assertTrue(summary.last_error.endswith("ERROR : Final error, something failed"))
 
+    def test_timestamp_variants_and_timestamp_only_boundary_lines(self):
+        self.log.write_text(
+            "2026/08/01 07:44:57:678 job started\n"
+            "2026-08-01 07:45:00,001 [1] WARN : warning\n"
+            "2026.08.01 08:00:03.004 job finished\n",
+            encoding="utf-8",
+        )
+        summary = analyze_log(self.log, "20261002")
+        self.assertEqual(summary.start_time, "2026-08-01 07:44:57.678")
+        self.assertEqual(summary.end_time, "2026-08-01 08:00:03.004")
+        self.assertEqual(summary.duration, "00:15:05")
+        self.assertEqual(summary.warning_count, 1)
+
+    def test_mixed_date_separators_are_accepted(self):
+        self.log.write_text(
+            "2026/08-01 07:44:57,678 [1] INFO : Start\n"
+            "2026-08/01 07:44:58:679 [1] ERROR : End\n",
+            encoding="utf-8",
+        )
+        summary = analyze_log(self.log, "20261002")
+        self.assertEqual(summary.start_time, "2026-08-01 07:44:57.678")
+        self.assertEqual(summary.end_time, "2026-08-01 07:44:58.679")
+        self.assertEqual(summary.error_count, 1)
+
+    def test_timestamp_model_cascade_supports_prefix_compact_dmy_and_month_names(self):
+        cases = [
+            (
+                "[worker-7] | 2026-08-01T07:44:57.678+02:00 INFO : Start\n"
+                "[worker-7] | 2026-08-01T07:45:00.001+02:00 INFO : End\n",
+                "2026-08-01 07:44:57.678", "2026-08-01 07:45:00.001",
+            ),
+            (
+                "20260801_074457.678 INFO : Start\n"
+                "20260801-074500,001 WARN : End\n",
+                "2026-08-01 07:44:57.678", "2026-08-01 07:45:00.001",
+            ),
+            (
+                "01/08/2026 07:44:57,678 INFO : Start\n"
+                "01.08.2026 07:45:00.001 ERROR : End\n",
+                "2026-08-01 07:44:57.678", "2026-08-01 07:45:00.001",
+            ),
+            (
+                "01-Aug-2026 07:44:57.678 INFO : Start\n"
+                "August 01, 2026 07:45:00.001 INFO : End\n",
+                "2026-08-01 07:44:57.678", "2026-08-01 07:45:00.001",
+            ),
+        ]
+        for index, (content, expected_start, expected_end) in enumerate(cases):
+            with self.subTest(index=index):
+                self.log.write_text(content, encoding="utf-8")
+                summary = analyze_log(self.log, "20261002")
+                self.assertEqual(summary.start_time, expected_start)
+                self.assertEqual(summary.end_time, expected_end)
+                self.assertEqual(summary.duration, "00:00:02")
+
+    def test_unicode_encoding_is_detected_per_log_file(self):
+        content = (
+            "2026-08-01 07:44:57,678 INFO : Start\n"
+            "2026-08-01 07:45:00,001 INFO : End\n"
+        )
+        for encoding, payload in (
+            ("utf-16", content.encode("utf-16")),
+            ("utf-16-le-no-bom", content.encode("utf-16-le")),
+        ):
+            with self.subTest(encoding=encoding):
+                self.log.write_bytes(payload)
+                summary = analyze_log(self.log, "20261002", encoding="utf-8-sig")
+                self.assertEqual(summary.start_time, "2026-08-01 07:44:57.678")
+                self.assertEqual(summary.end_time, "2026-08-01 07:45:00.001")
+
+    def test_timestamp_timezone_and_ampm_affect_duration_but_not_csv_format(self):
+        self.log.write_text(
+            "2026-08-01 11:30:00 PM +02:00 INFO : Start\n"
+            "2026-08-02 12:30:00 AM +01:00 INFO : End\n",
+            encoding="utf-8",
+        )
+        summary = analyze_log(self.log, "20261002")
+        self.assertEqual(summary.start_time, "2026-08-01 23:30:00.000")
+        self.assertEqual(summary.end_time, "2026-08-02 00:30:00.000")
+        self.assertEqual(summary.duration, "02:00:00")
+
     def test_recurse_filter_uppercase_extension_excel_safe_csv(self):
         sibling = self.logs_root / "20260930" / "Other"
         sibling.mkdir(parents=True)

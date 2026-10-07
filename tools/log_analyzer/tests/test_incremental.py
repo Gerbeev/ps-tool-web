@@ -34,12 +34,12 @@ class IncrementalCobTests(unittest.TestCase):
         self.state_path = self.envdir / ".state" / f"{self.cob}.json"
         self.active_time = datetime(2026, 10, 7, 12, tzinfo=timezone.utc)
 
-    def run_scan(self, *, now=None, force=False, only_date=None, encoding="utf-8-sig", delimiter=","):
+    def run_scan(self, *, now=None, force=False, only_date=None, encoding="utf-8-sig", delimiter=",", policy=None):
         out, err = StringIO(), StringIO()
         result = analyze.write_csv(
             root=self.root, output_dir=self.work / "output", environment="PROD",
             encoding=encoding, delimiter=delimiter, only_date=only_date,
-            policy=analyze.IncrementalPolicy(7, 72),
+            policy=policy or analyze.IncrementalPolicy(7, 72),
             now=now or self.active_time, force=force, stdout=out, stderr=err,
         )
         return result, out.getvalue(), err.getvalue()
@@ -267,7 +267,7 @@ class IncrementalCobTests(unittest.TestCase):
     def test_stable_log_without_terminal_newline_is_supported(self):
         import time
         self.first.write_text("2026-10-06 10:00:00 [1] ERROR : End", encoding="utf-8")
-        old = time.time() - 3600
+        old = self.active_time.timestamp() - 3600
         os.utime(self.first, (old, old))
         self.run_scan()
         self.assertEqual(self.rows()["a"]["error_count"], "1")
@@ -442,6 +442,19 @@ class IncrementalCobTests(unittest.TestCase):
         self.assertEqual(state_bytes, self.state_path.read_bytes())
         self.assertIn("payload bytes scanned 0", out)
 
+    def test_parallel_workers_setting_reaches_executor(self):
+        original_executor = analyze.ThreadPoolExecutor
+        seen = []
+
+        def capturing_executor(*args, **kwargs):
+            seen.append(kwargs.get("max_workers", args[0] if args else None))
+            return original_executor(*args, **kwargs)
+
+        policy = analyze.IncrementalPolicy(7, 72, 5, 8, 7)
+        with patch.object(analyze, "ThreadPoolExecutor", side_effect=capturing_executor):
+            self.run_scan(policy=policy)
+        self.assertEqual(seen, [8])
+
     def test_worker_concurrency_is_bounded(self):
         import threading
         import time
@@ -475,13 +488,19 @@ class IncrementalCobTests(unittest.TestCase):
         config = self.work / "config.json"
         config.write_text(json.dumps({"incremental": {"min_active_days": 7, "quiet_hours": 72}}))
         self.assertEqual(analyze.read_policy(config).quiet_hours, 72)
-        self.assertEqual(analyze.read_policy(config).read_workers, 4)
+        self.assertEqual(analyze.read_policy(config).parallel_workers, 4)
         config.write_text(json.dumps({"incremental": {"min_active_days": True}}))
         with self.assertRaises(ValueError):
             analyze.read_policy(config)
-        config.write_text(json.dumps({"incremental": {"read_workers": 17}}))
-        with self.assertRaisesRegex(ValueError, "read_workers"):
+        config.write_text(json.dumps({"incremental": {"parallel_workers": 17}}))
+        with self.assertRaisesRegex(ValueError, "parallel_workers"):
             analyze.read_policy(config)
+
+    def test_legacy_read_workers_alias_is_supported(self):
+        config = self.work / "legacy-workers.json"
+        config.write_text(json.dumps({"incremental": {"read_workers": 8}}))
+        self.assertEqual(analyze.read_policy(config).parallel_workers, 8)
+
 
 
 if __name__ == "__main__":

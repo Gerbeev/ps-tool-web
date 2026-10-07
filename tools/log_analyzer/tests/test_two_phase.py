@@ -53,7 +53,7 @@ class TwoPhaseTests(unittest.TestCase):
         self.assertIn("opened log contents 0", stdout)
         row = self.rows()[0]
         self.assertEqual(row["system"], "Downstream")
-        self.assertEqual(row["path"], "Downstream/jobs/abc.log")
+        self.assertEqual(row["path"], str(self.file))
         self.assertEqual(int(row["file_size_bytes"]), self.file.stat().st_size)
         self.assertEqual(row["enrichment_status"], "Pending")
         self.assertEqual(row["job_status"], "Unknown")
@@ -61,6 +61,18 @@ class TwoPhaseTests(unittest.TestCase):
         self.assertEqual(row["duration"], "")
         self.assertTrue(row["last_modified_time"])
         self.assertEqual(json.loads(self.state.read_text())["status"], "open")
+
+    def test_csv_temporal_fields_use_one_format_without_iso_timezone_suffix(self):
+        self.run_mode("enrich")
+        row = self.rows()[0]
+        self.assertEqual(row["job_date"], "2026-10-05")
+        self.assertEqual(row["start_time"], "2026-10-06 01:00:00.000")
+        self.assertEqual(row["end_time"], "2026-10-06 01:00:00.000")
+        for field in ("last_modified_time", "start_time", "end_time", "enriched_at_utc"):
+            value = row[field]
+            self.assertRegex(value, r"^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}\.\d{3}$")
+            self.assertNotIn("T", value)
+            self.assertNotRegex(value, r"(?:Z|[+-]\d{2}:\d{2})$")
 
     def test_csv_header_places_activity_status_before_path_at_end(self):
         self.run_mode()
@@ -89,7 +101,7 @@ class TwoPhaseTests(unittest.TestCase):
         with self.report.open("r", encoding="utf-8-sig", newline="") as file:
             header = next(csv.reader(file))
         self.assertEqual(header[-2:], ["activity_status", "path"])
-        self.assertEqual(self.rows()[0]["path"], "Downstream/jobs/abc.log")
+        self.assertEqual(self.rows()[0]["path"], str(self.file))
 
     def test_inventory_no_op_does_not_rewrite_report_or_state(self):
         self.run_mode()
@@ -170,7 +182,7 @@ class TwoPhaseTests(unittest.TestCase):
         self.run_mode("inventory")
         self.assertEqual(len(self.rows()), 2)
         self.assertEqual({r["path"] for r in self.rows()},
-                         {"Downstream/jobs/abc.log", "Upstream/abc.log"})
+                         {str(self.file), str(other)})
 
     def test_legacy_enriched_state_reused_as_enriched(self):
         self.run_mode("enrich")

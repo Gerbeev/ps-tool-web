@@ -124,7 +124,7 @@ class ConsoleMenu:
             self.show("Scope       : Enrich pending/stale/changed logs (read-only SMB)")
         self.show(f"COB window  : Latest {policy.cob_scan_limit} root-level COB folders")
         self.show(f"Retention   : Minimum {policy.min_active_days} days + {policy.quiet_hours}h without changes")
-        self.show(f"SMB readers : {policy.read_workers} (bounded concurrent read-only handles)")
+        self.show(f"Parallelism : {policy.parallel_workers} workers (concurrent read-only log parsing)")
         self.show(f"CSV output  : {output}")
         self.show("Unchanged CSVs remain untouched. Closed COBs are skipped.")
         prompt = "Start inventory? [y/N]: " if mode == "inventory" else "Start enrichment? [y/N]: "
@@ -183,9 +183,9 @@ class ConsoleMenu:
     def edit_incremental(self, config: dict, key: str, prompt: str) -> None:
         defaults = {
             "min_active_days": 7, "quiet_hours": 72, "recent_minutes": 5,
-            "read_workers": 4, "cob_scan_limit": 7,
+            "parallel_workers": 4, "cob_scan_limit": 7,
         }
-        max_allowed = 16 if key == "read_workers" else (10000 if key == "cob_scan_limit" else 87600)
+        max_allowed = 16 if key == "parallel_workers" else (10000 if key == "cob_scan_limit" else 87600)
         current = config.get("incremental", {}).get(key, defaults[key])
         self.show(f"Current {key}: {current}")
         value = self.ask(f"{prompt} (1-{max_allowed}, empty = cancel): ")
@@ -199,7 +199,10 @@ class ConsoleMenu:
         if not 1 <= number <= max_allowed:
             self.show(f"Value must be between 1 and {max_allowed}.")
             return
-        config.setdefault("incremental", {})[key] = number
+        incremental = config.setdefault("incremental", {})
+        incremental[key] = number
+        if key == "parallel_workers":
+            incremental.pop("read_workers", None)
         self.save(config)
 
     def settings(self) -> None:
@@ -217,7 +220,7 @@ class ConsoleMenu:
             self.show("4. Minimum active COB days")
             self.show("5. Quiet hours before COB finalization")
             self.show("6. Recent log activity window (minutes)")
-            self.show("7. Concurrent SMB readers (1-16)")
+            self.show("7. Parallel log workers (1-16)")
             self.show("8. Latest COB folders to scan")
             self.show("0. Back")
             action = self.ask("Select: ")
@@ -229,7 +232,7 @@ class ConsoleMenu:
                 "4": lambda cfg: self.edit_incremental(cfg, "min_active_days", "Minimum active days"),
                 "5": lambda cfg: self.edit_incremental(cfg, "quiet_hours", "Quiet hours"),
                 "6": lambda cfg: self.edit_incremental(cfg, "recent_minutes", "Recent activity (minutes)"),
-                "7": lambda cfg: self.edit_incremental(cfg, "read_workers", "Concurrent SMB readers"),
+                "7": lambda cfg: self.edit_incremental(cfg, "parallel_workers", "Parallel log workers"),
                 "8": lambda cfg: self.edit_incremental(cfg, "cob_scan_limit", "Latest COB folders to scan"),
             }
             handler = operations.get(action)
